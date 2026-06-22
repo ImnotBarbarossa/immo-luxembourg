@@ -69,7 +69,7 @@ exports.handler = async (event) => {
         daysAgo,
         url: permalink ? `${ATHOME_BASE}/fr${permalink}` : searchUrl,
         image: item.media?.items?.[0]?.uri
-          ? `https://i1.static.athome.eu/images/annonces2/image_/360x265/${item.media.items[0].uri.replace(/^\//, '')}`
+          ? `https://i1.static.athome.eu/images/annonces2/image_/${item.media.items[0].uri.replace(/^\//, '')}`
           : null,
       };
     });

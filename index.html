@@ -170,7 +170,10 @@
   .listing-thumb {
     width: 80px; height: 64px; border-radius: var(--radius-sm);
     display: flex; align-items: center; justify-content: center;
-    font-size: 26px; flex-shrink: 0;
+    font-size: 26px; flex-shrink: 0; overflow: hidden;
+  }
+  .listing-thumb img {
+    width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-sm);
   }
   .listing-title { font-size: 14px; font-weight: 500; margin-bottom: 3px; }
   .listing-loc { font-size: 12px; color: var(--text-muted); margin-bottom: 5px; display: flex; align-items: center; gap: 3px; }
@@ -613,7 +616,9 @@ function renderListings() {
 
   document.getElementById('listingsContainer').innerHTML = page.map(l => `
     <a class="listing-card" href="${l.url || 'https://www.athome.lu/srp/?tr=buy&q=Luxembourg'}" target="_blank" rel="noopener">
-      <div class="listing-thumb" style="background:${typeBg[l.type]||'#f3f4f6'}">${typeEmoji[l.type]||'🏠'}</div>
+      <div class="listing-thumb" style="background:${typeBg[l.type]||'#f3f4f6'}">
+        ${l.image ? `<img src="${l.image}" alt="${l.title}" loading="lazy" onerror="this.parentElement.innerHTML='${typeEmoji[l.type]||'🏠'}'">` : (typeEmoji[l.type]||'🏠')}
+      </div>
       <div>
         <div class="listing-title">${l.title}</div>
         <div class="listing-loc"><i class="ti ti-map-pin" aria-hidden="true" style="font-size:11px"></i> ${l.location}</div>
