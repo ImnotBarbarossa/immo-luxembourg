@@ -520,7 +520,10 @@ Prix réalistes LU : maisons 600k-2M€, appartements 400k-900k€. 20% isNew. V
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
     });
-    const data = await resp.json();
+    const rawText = await resp.text();
+    if (!rawText) throw new Error('La fonction serveur n\'a renvoyé aucune réponse (status ' + resp.status + ')');
+    const data = JSON.parse(rawText);
+    if (data.error) throw new Error('Erreur API : ' + (data.error.message || JSON.stringify(data.error)));
     const text = data.content?.map(b => b.text || '').join('') || '';
     const clean = text.replace(/```json|```/g, '').trim();
     allListings = JSON.parse(clean.slice(clean.indexOf('['), clean.lastIndexOf(']') + 1));
