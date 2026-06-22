@@ -454,7 +454,6 @@
 </div>
 
 <script>
-const ANTHROPIC_API_KEY = 'YOUR_API_KEY_HERE';
 
 let allListings = [];
 let currentPage = 1;
@@ -516,9 +515,9 @@ Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown. Chaque objet :
 Prix réalistes LU : maisons 600k-2M€, appartements 400k-900k€. 20% isNew. Varie sources parmi ${JSON.stringify(sources)}. Retourne exactement 16 objets.`;
 
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
     });
     const data = await resp.json();
