@@ -558,25 +558,15 @@ async function doSearch() {
     delay += 500;
   }
 
-  const prompt = `Tu es un agrégateur immobilier au Luxembourg. Génère 16 annonces réalistes de ${type || 'biens immobiliers (maisons, appartements, villas)'} à vendre${region ? ' dans la région : ' + region : ' dans tout le Luxembourg'}${budget ? ', budget max ' + parseInt(budget).toLocaleString('fr-FR') + ' €' : ''}.
-Sources disponibles : ${sources.join(', ')}.
-Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown. Chaque objet :
-{"id":"string","title":"titre court","type":"Maison"|"Appartement"|"Villa"|"Terrain","location":"commune, Luxembourg","price":number,"surface":number,"rooms":number,"bedrooms":number,"source":"${sources[0]}","isNew":boolean,"daysAgo":number}
-Prix réalistes LU : maisons 600k-2M€, appartements 400k-900k€. 20% isNew. Varie sources parmi ${JSON.stringify(sources)}. Retourne exactement 16 objets.`;
-
   try {
-    const resp = await fetch('/.netlify/functions/claude', {
+    const resp = await fetch('/.netlify/functions/listings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ type, region, budget })
     });
-    const rawText = await resp.text();
-    if (!rawText) throw new Error('La fonction serveur n\'a renvoyé aucune réponse (status ' + resp.status + ')');
-    const data = JSON.parse(rawText);
-    if (data.error) throw new Error('Erreur API : ' + (data.error.message || JSON.stringify(data.error)));
-    const text = data.content?.map(b => b.text || '').join('') || '';
-    const clean = text.replace(/```json|```/g, '').trim();
-    allListings = JSON.parse(clean.slice(clean.indexOf('['), clean.lastIndexOf(']') + 1));
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    allListings = data.listings || [];
 
     hide('loadingState');
     document.getElementById('searchBtn').disabled = false;
@@ -622,7 +612,7 @@ function renderListings() {
   document.getElementById('resultCount').textContent = `${total} annonce${total>1?'s':''} trouvée${total>1?'s':''}`;
 
   document.getElementById('listingsContainer').innerHTML = page.map(l => `
-    <a class="listing-card" href="${buildSearchUrl(l.source, l.type, l.location, document.getElementById('budgetFilter').value)}" target="_blank" rel="noopener">
+    <a class="listing-card" href="${l.url || 'https://www.athome.lu/srp/?tr=buy&q=Luxembourg'}" target="_blank" rel="noopener">
       <div class="listing-thumb" style="background:${typeBg[l.type]||'#f3f4f6'}">${typeEmoji[l.type]||'🏠'}</div>
       <div>
         <div class="listing-title">${l.title}</div>
