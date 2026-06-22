@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Immo Luxembourg — Recherche agrégée</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/tabler-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #1D9E75;
+    --green-dark: #0F6E56;
+    --green-light: #E1F5EE;
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.1);
+    --border-strong: rgba(0,0,0,0.2);
+    --text: #1a1a1a;
+    --text-muted: #6b7280;
+    --text-light: #9ca3af;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111827;
+      --surface: #1f2937;
+      --border: rgba(255,255,255,0.1);
+      --border-strong: rgba(255,255,255,0.2);
+      --text: #f9fafb;
+      --text-muted: #9ca3af;
+      --text-light: #6b7280;
+      --green-light: rgba(29,158,117,0.15);
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 0 1.5rem;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-inner {
+    max-width: 900px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0;
+  }
+  .logo { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 17px; }
+  .logo-icon { color: var(--green); font-size: 22px; }
+  .logo-badge { font-size: 11px; background: var(--green-light); color: var(--green-dark); padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+
+  .alert-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: var(--radius-sm);
+    background: var(--green); color: white; border: none;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    font-family: inherit; transition: background 0.15s;
+  }
+  .alert-btn:hover { background: var(--green-dark); }
+
+  main { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+
+  .search-panel {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .sources-bar {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem;
+  }
+  .source-pill {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 11px; border-radius: 20px; font-size: 12px;
+    cursor: pointer; border: 0.5px solid var(--border-strong);
+    background: var(--surface); color: var(--text-muted);
+    transition: all 0.15s; user-select: none;
+  }
+  .source-pill.active { border-color: var(--green); background: var(--green-light); color: var(--green-dark); }
+  .source-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+  @media (max-width: 600px) {
+    .filters { grid-template-columns: 1fr 1fr; }
+  }
+
+  .filters select, .filters input {
+    padding: 9px 10px;
+    border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border-strong);
+    background: var(--bg); color: var(--text);
+    font-size: 13px; font-family: inherit;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+  }
+
+  .search-btn {
+    grid-column: 1 / -1;
+    padding: 11px;
+    border-radius: var(--radius-sm);
+    background: var(--green); color: white; border: none;
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    font-family: inherit; transition: background 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .search-btn:hover { background: var(--green-dark); }
+  .search-btn:disabled { opacity: 0.6; cursor: default; }
+
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    margin-bottom: 1.25rem;
+  }
+  @media (max-width: 600px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+  .stat-card {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px;
+  }
+  .stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  .stat-value { font-size: 18px; font-weight: 600; }
+
+  .sort-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .sort-row span { font-size: 13px; color: var(--text-muted); }
+  .sort-row select {
+    padding: 6px 10px; font-size: 12px; border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border-strong); background: var(--surface);
+    color: var(--text); font-family: inherit;
+  }
+
+  .listings { display: grid; gap: 10px; }
+
+  .listing-card {
+    display: grid;
+    grid-template-columns: 80px 1fr auto;
+    gap: 12px; align-items: start;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px; cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    text-decoration: none; color: inherit;
+  }
+  .listing-card:hover { border-color: var(--green); box-shadow: 0 2px 12px rgba(29,158,117,0.1); }
+  @media (max-width: 480px) {
+    .listing-card { grid-template-columns: 60px 1fr; }
+    .listing-right { grid-column: 2; }
+  }
+
+  .listing-thumb {
+    width: 80px; height: 64px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; flex-shrink: 0;
+  }
+  .listing-title { font-size: 14px; font-weight: 500; margin-bottom: 3px; }
+  .listing-loc { font-size: 12px; color: var(--text-muted); margin-bottom: 5px; display: flex; align-items: center; gap: 3px; }
+  .listing-specs { display: flex; gap: 10px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+  .listing-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 100px; }
+  .listing-price { font-size: 15px; font-weight: 600; }
+  .listing-ppm { font-size: 11px; color: var(--text-muted); }
+  .source-badge {
+    font-size: 11px; padding: 2px 7px; border-radius: 10px;
+    border: 0.5px solid var(--border); color: var(--text-muted);
+  }
+  .new-badge { font-size: 10px; padding: 2px 6px; border-radius: 6px; background: var(--green-light); color: var(--green-dark); font-weight: 600; }
+  .date-label { font-size: 11px; color: var(--text-light); }
+
+  .state-box { text-align: center; padding: 3rem 1rem; }
+  .state-icon { font-size: 40px; color: var(--green); display: block; margin-bottom: 12px; }
+  .state-title { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+  .state-sub { font-size: 13px; color: var(--text-muted); }
+
+  .spinner {
+    width: 32px; height: 32px; border: 2px solid var(--border);
+    border-top-color: var(--green); border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .progress-steps { display: flex; flex-direction: column; gap: 6px; max-width: 260px; margin: 12px auto 0; }
+  .prog-step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
+  .prog-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .prog-step.done .prog-dot { background: var(--green); }
+  .prog-step.done { color: var(--text); }
+  .prog-step.active .prog-dot { background: var(--green); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 1.25rem; flex-wrap: wrap; }
+  .page-btn {
+    padding: 7px 12px; border-radius: var(--radius-sm); font-size: 13px;
+    border: 0.5px solid var(--border-strong); background: var(--surface);
+    cursor: pointer; color: var(--text); font-family: inherit; transition: all 0.12s;
+  }
+  .page-btn.active { background: var(--green); color: white; border-color: var(--green); }
+  .page-btn:disabled { opacity: 0.4; cursor: default; }
+
+  .error-box {
+    background: #fef2f2; border: 0.5px solid #fca5a5; border-radius: var(--radius);
+    padding: 12px 16px; font-size: 13px; color: #7f1d1d; margin-bottom: 1rem;
+  }
+
+  .disclaimer {
+    font-size: 11px; color: var(--text-light); margin-top: 1.5rem;
+    padding-top: 1rem; border-top: 0.5px solid var(--border); line-height: 1.6;
+  }
+
+  /* Alert Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200;
+    display: flex; align-items: center; justify-content: center; padding: 1rem;
+  }
+  .modal {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 1.5rem; max-width: 440px; width: 100%;
+    border: 0.5px solid var(--border);
+  }
+  .modal h2 { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+  .modal p { font-size: 13px; color: var(--text-muted); margin-bottom: 1.25rem; }
+  .modal-field { margin-bottom: 12px; }
+  .modal-field label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-muted); }
+  .modal-field input, .modal-field select {
+    width: 100%; padding: 9px 10px; border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border-strong); background: var(--bg);
+    color: var(--text); font-size: 13px; font-family: inherit;
+  }
+  .modal-actions { display: flex; gap: 8px; margin-top: 1.25rem; }
+  .modal-cancel {
+    flex: 1; padding: 10px; border-radius: var(--radius-sm); font-size: 13px;
+    border: 0.5px solid var(--border-strong); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: inherit;
+  }
+  .modal-save {
+    flex: 2; padding: 10px; border-radius: var(--radius-sm); font-size: 13px;
+    background: var(--green); color: white; border: none;
+    cursor: pointer; font-family: inherit; font-weight: 500;
+  }
+  .modal-save:hover { background: var(--green-dark); }
+
+  .alert-success {
+    background: var(--green-light); border: 0.5px solid var(--green);
+    border-radius: var(--radius); padding: 14px 16px;
+    font-size: 13px; color: var(--green-dark); margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .active-alerts {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1.25rem;
+  }
+  .active-alerts h3 { font-size: 13px; font-weight: 500; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .alert-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; border-top: 0.5px solid var(--border); font-size: 12px;
+  }
+  .alert-item-desc { color: var(--text-muted); }
+  .alert-delete { background: none; border: none; color: var(--text-light); cursor: pointer; font-size: 14px; padding: 2px 4px; }
+  .alert-delete:hover { color: #dc2626; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <i class="ti ti-building-estate logo-icon" aria-hidden="true"></i>
+      Immo Luxembourg
+      <span class="logo-badge">Agrégateur</span>
+    </div>
+    <button class="alert-btn" onclick="openAlertModal()">
+      <i class="ti ti-bell" aria-hidden="true"></i>
+      Créer une alerte
+    </button>
+  </div>
+</header>
+
+<main>
+  <div id="alertSuccess" class="alert-success" style="display:none">
+    <i class="ti ti-check" aria-hidden="true"></i>
+    <span id="alertSuccessText"></span>
+  </div>
+
+  <div id="activeAlerts" class="active-alerts" style="display:none">
+    <h3><i class="ti ti-bell-ringing" aria-hidden="true" style="color:var(--green)"></i> Alertes actives</h3>
+    <div id="alertsList"></div>
+  </div>
+
+  <div class="search-panel">
+    <div class="sources-bar" id="sourcesBar">
+      <div class="source-pill active" data-source="athome" onclick="toggleSource(this)"><span class="dot"></span> Athome.lu</div>
+      <div class="source-pill active" data-source="immotop" onclick="toggleSource(this)"><span class="dot"></span> Immotop.lu</div>
+      <div class="source-pill active" data-source="remax" onclick="toggleSource(this)"><span class="dot"></span> RE/MAX</div>
+      <div class="source-pill active" data-source="logicimmo" onclick="toggleSource(this)"><span class="dot"></span> Logic-immo.lu</div>
+      <div class="source-pill active" data-source="era" onclick="toggleSource(this)"><span class="dot"></span> ERA Luxembourg</div>
+    </div>
+    <div class="filters">
+      <select id="typeFilter">
+        <option value="">Tous les types</option>
+        <option value="maison">Maison</option>
+        <option value="appartement">Appartement</option>
+        <option value="villa">Villa</option>
+        <option value="terrain">Terrain</option>
+      </select>
+      <select id="regionFilter">
+        <option value="">Toute région</option>
+        <option value="luxembourg">Ville de Luxembourg</option>
+        <option value="esch">Esch-sur-Alzette</option>
+        <option value="differdange">Differdange</option>
+        <option value="dudelange">Dudelange</option>
+        <option value="strassen">Strassen</option>
+        <option value="bertrange">Bertrange</option>
+        <option value="hesperange">Hesperange</option>
+        <option value="nord">Luxembourg Nord</option>
+        <option value="est">Luxembourg Est</option>
+      </select>
+      <select id="budgetFilter">
+        <option value="">Budget max</option>
+        <option value="500000">500 000 €</option>
+        <option value="750000">750 000 €</option>
+        <option value="1000000">1 000 000 €</option>
+        <option value="1500000">1 500 000 €</option>
+        <option value="2000000">2 000 000 €</option>
+      </select>
+      <button class="search-btn" onclick="doSearch()" id="searchBtn">
+        <i class="ti ti-search" aria-hidden="true"></i> Rechercher
+      </button>
+    </div>
+  </div>
+
+  <div id="errorState" class="error-box" style="display:none"></div>
+
+  <div id="statsRow" class="stats-row" style="display:none">
+    <div class="stat-card"><div class="stat-label">Annonces</div><div class="stat-value" id="statCount">—</div></div>
+    <div class="stat-card"><div class="stat-label">Prix médian</div><div class="stat-value" id="statMedian">—</div></div>
+    <div class="stat-card"><div class="stat-label">Prix moyen/m²</div><div class="stat-value" id="statPpm">—</div></div>
+    <div class="stat-card"><div class="stat-label">Sources</div><div class="stat-value" id="statSources">—</div></div>
+  </div>
+
+  <div id="loadingState" class="state-box" style="display:none">
+    <div class="spinner"></div>
+    <div class="state-title">Recherche en cours sur les portails…</div>
+    <div class="progress-steps" id="progressSteps"></div>
+  </div>
+
+  <div id="sortRow" class="sort-row" style="display:none">
+    <span id="resultCount"></span>
+    <select id="sortSelect" onchange="renderListings()">
+      <option value="date">Plus récentes</option>
+      <option value="price_asc">Prix croissant</option>
+      <option value="price_desc">Prix décroissant</option>
+      <option value="surface">Surface</option>
+    </select>
+  </div>
+
+  <div id="listingsContainer" class="listings"></div>
+  <div id="paginationContainer" class="pagination" style="display:none"></div>
+
+  <div id="emptyState" class="state-box" style="display:none">
+    <i class="ti ti-home-off state-icon" aria-hidden="true"></i>
+    <div class="state-title">Aucune annonce trouvée</div>
+    <div class="state-sub">Essayez d'élargir vos critères de recherche</div>
+  </div>
+
+  <div id="initialState" class="state-box">
+    <i class="ti ti-map-search state-icon" aria-hidden="true"></i>
+    <div class="state-title">Trouvez votre bien idéal au Luxembourg</div>
+    <div class="state-sub">Sélectionnez vos critères et lancez la recherche</div>
+  </div>
+
+  <div class="disclaimer" id="disclaimerEl" style="display:none">
+    <i class="ti ti-info-circle" aria-hidden="true"></i>
+    Les annonces sont générées par l'IA à des fins de démonstration et ne représentent pas de vraies annonces. Pour consulter les vraies annonces, visitez directement les sites athome.lu, immotop.lu, remax.lu, logic-immo.lu ou era.lu.
+  </div>
+</main>
+
+<!-- Alert Modal -->
+<div class="modal-overlay" id="alertModal" style="display:none" onclick="closeAlertModal(event)">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Créer une alerte email">
+    <h2><i class="ti ti-bell" aria-hidden="true" style="color:var(--green); margin-right:6px;"></i>Nouvelle alerte email</h2>
+    <p>Recevez un email dès qu'un nouveau bien correspond à vos critères.</p>
+
+    <div class="modal-field">
+      <label>Email de notification</label>
+      <input type="email" id="alertEmail" value="antoine.denauw@gmail.com" placeholder="votre@email.com">
+    </div>
+    <div class="modal-field">
+      <label>Type de bien</label>
+      <select id="alertType">
+        <option value="">Tous les types</option>
+        <option value="maison">Maison</option>
+        <option value="appartement">Appartement</option>
+        <option value="villa">Villa</option>
+        <option value="terrain">Terrain</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Région</label>
+      <select id="alertRegion">
+        <option value="">Toute région</option>
+        <option value="luxembourg">Ville de Luxembourg</option>
+        <option value="esch">Esch-sur-Alzette</option>
+        <option value="differdange">Differdange</option>
+        <option value="dudelange">Dudelange</option>
+        <option value="strassen">Strassen</option>
+        <option value="bertrange">Bertrange</option>
+        <option value="hesperange">Hesperange</option>
+        <option value="nord">Luxembourg Nord</option>
+        <option value="est">Luxembourg Est</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Budget maximum</label>
+      <select id="alertBudget">
+        <option value="">Pas de limite</option>
+        <option value="500000">500 000 €</option>
+        <option value="750000">750 000 €</option>
+        <option value="1000000">1 000 000 €</option>
+        <option value="1500000">1 500 000 €</option>
+        <option value="2000000">2 000 000 €</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Fréquence</label>
+      <select id="alertFreq">
+        <option value="instant">Immédiatement</option>
+        <option value="daily" selected>Résumé quotidien</option>
+        <option value="weekly">Résumé hebdomadaire</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeAlertModal()">Annuler</button>
+      <button class="modal-save" onclick="saveAlert()"><i class="ti ti-check" aria-hidden="true"></i> Enregistrer l'alerte</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ANTHROPIC_API_KEY = 'YOUR_API_KEY_HERE';
+
+let allListings = [];
+let currentPage = 1;
+const PER_PAGE = 8;
+let activeSources = new Set(['athome','immotop','remax','logicimmo','era']);
+let savedAlerts = JSON.parse(localStorage.getItem('immo_alerts') || '[]');
+
+const sourceLabels = { athome:'Athome.lu', immotop:'Immotop.lu', remax:'RE/MAX', logicimmo:'Logic-immo.lu', era:'ERA Luxembourg' };
+const typeBg = { Maison:'#E1F5EE', Appartement:'#E6F1FB', Villa:'#FAECE7', Terrain:'#EAF3DE' };
+const typeEmoji = { Maison:'🏡', Appartement:'🏢', Villa:'🏛️', Terrain:'🌿' };
+
+function toggleSource(el) {
+  const src = el.dataset.source;
+  if (activeSources.has(src)) {
+    if (activeSources.size === 1) return;
+    activeSources.delete(src); el.classList.remove('active');
+  } else {
+    activeSources.add(src); el.classList.add('active');
+  }
+}
+
+function formatPrice(n) {
+  return new Intl.NumberFormat('fr-FR', { style:'currency', currency:'EUR', maximumFractionDigits:0 }).format(n);
+}
+
+function show(id) { document.getElementById(id).style.display = 'block'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+
+async function doSearch() {
+  const type = document.getElementById('typeFilter').value;
+  const region = document.getElementById('regionFilter').value;
+  const budget = document.getElementById('budgetFilter').value;
+
+  hide('initialState'); hide('emptyState'); hide('errorState');
+  hide('statsRow'); hide('sortRow'); hide('disclaimerEl'); hide('paginationContainer');
+  document.getElementById('listingsContainer').innerHTML = '';
+
+  show('loadingState');
+  document.getElementById('searchBtn').disabled = true;
+
+  const sources = [...activeSources];
+  const steps = document.getElementById('progressSteps');
+  steps.innerHTML = sources.map(s => `<div class="prog-step" id="prog-${s}"><div class="prog-dot"></div><span>Recherche sur ${sourceLabels[s]}…</span></div>`).join('');
+
+  let delay = 0;
+  for (const s of sources) {
+    setTimeout(() => {
+      document.querySelectorAll('.prog-step').forEach(e => e.classList.remove('active'));
+      const el = document.getElementById('prog-'+s);
+      if (el) el.classList.add('active');
+    }, delay);
+    delay += 500;
+  }
+
+  const prompt = `Tu es un agrégateur immobilier au Luxembourg. Génère 16 annonces réalistes de ${type || 'biens immobiliers (maisons, appartements, villas)'} à vendre${region ? ' dans la région : ' + region : ' dans tout le Luxembourg'}${budget ? ', budget max ' + parseInt(budget).toLocaleString('fr-FR') + ' €' : ''}.
+Sources disponibles : ${sources.join(', ')}.
+Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown. Chaque objet :
+{"id":"string","title":"titre court","type":"Maison"|"Appartement"|"Villa"|"Terrain","location":"commune, Luxembourg","price":number,"surface":number,"rooms":number,"bedrooms":number,"source":"${sources[0]}","isNew":boolean,"daysAgo":number,"url":"https://exemple.lu/bien"}
+Prix réalistes LU : maisons 600k-2M€, appartements 400k-900k€. 20% isNew. Varie sources parmi ${JSON.stringify(sources)}. Retourne exactement 16 objets.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await resp.json();
+    const text = data.content?.map(b => b.text || '').join('') || '';
+    const clean = text.replace(/```json|```/g, '').trim();
+    allListings = JSON.parse(clean.slice(clean.indexOf('['), clean.lastIndexOf(']') + 1));
+
+    hide('loadingState');
+    document.getElementById('searchBtn').disabled = false;
+
+    if (!allListings.length) { show('emptyState'); return; }
+
+    currentPage = 1;
+    updateStats();
+    show('statsRow'); show('sortRow'); show('disclaimerEl');
+    renderListings();
+  } catch(err) {
+    hide('loadingState');
+    document.getElementById('searchBtn').disabled = false;
+    const errEl = document.getElementById('errorState');
+    errEl.style.display = 'block';
+    errEl.textContent = '⚠️ Erreur : ' + (err.message || 'Problème de connexion. Vérifiez votre clé API.');
+  }
+}
+
+function updateStats() {
+  const prices = [...allListings].map(l => l.price).sort((a,b) => a-b);
+  const median = prices[Math.floor(prices.length/2)];
+  const withSurface = allListings.filter(l => l.surface > 0);
+  const avgPpm = withSurface.length ? Math.round(withSurface.reduce((s,l) => s + l.price/l.surface, 0) / withSurface.length) : 0;
+  document.getElementById('statCount').textContent = allListings.length;
+  document.getElementById('statMedian').textContent = formatPrice(median);
+  document.getElementById('statPpm').textContent = formatPrice(avgPpm) + '/m²';
+  document.getElementById('statSources').textContent = new Set(allListings.map(l => l.source)).size;
+}
+
+function renderListings() {
+  const sort = document.getElementById('sortSelect').value;
+  let data = [...allListings];
+  if (sort === 'price_asc') data.sort((a,b) => a.price - b.price);
+  else if (sort === 'price_desc') data.sort((a,b) => b.price - a.price);
+  else if (sort === 'surface') data.sort((a,b) => b.surface - a.surface);
+  else data.sort((a,b) => a.daysAgo - b.daysAgo);
+
+  const total = data.length;
+  const totalPages = Math.ceil(total / PER_PAGE);
+  const page = data.slice((currentPage-1)*PER_PAGE, currentPage*PER_PAGE);
+
+  document.getElementById('resultCount').textContent = `${total} annonce${total>1?'s':''} trouvée${total>1?'s':''}`;
+
+  document.getElementById('listingsContainer').innerHTML = page.map(l => `
+    <a class="listing-card" href="${l.url}" target="_blank" rel="noopener">
+      <div class="listing-thumb" style="background:${typeBg[l.type]||'#f3f4f6'}">${typeEmoji[l.type]||'🏠'}</div>
+      <div>
+        <div class="listing-title">${l.title}</div>
+        <div class="listing-loc"><i class="ti ti-map-pin" aria-hidden="true" style="font-size:11px"></i> ${l.location}</div>
+        <div class="listing-specs">
+          ${l.surface ? `<span><i class="ti ti-layout-2" aria-hidden="true" style="font-size:11px"></i> ${l.surface} m²</span>` : ''}
+          ${l.rooms ? `<span><i class="ti ti-door" aria-hidden="true" style="font-size:11px"></i> ${l.rooms} pièces</span>` : ''}
+          ${l.bedrooms ? `<span><i class="ti ti-bed" aria-hidden="true" style="font-size:11px"></i> ${l.bedrooms} ch.</span>` : ''}
+        </div>
+      </div>
+      <div class="listing-right">
+        <div class="listing-price">${formatPrice(l.price)}</div>
+        ${l.surface ? `<div class="listing-ppm">${formatPrice(Math.round(l.price/l.surface))}/m²</div>` : ''}
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+          ${l.isNew ? '<span class="new-badge">Nouveau</span>' : ''}
+          <span class="source-badge">${sourceLabels[l.source]||l.source}</span>
+        </div>
+        <div class="date-label">${l.daysAgo===0?"Aujourd'hui":l.daysAgo===1?'Hier':`Il y a ${l.daysAgo}j`}</div>
+      </div>
+    </a>
+  `).join('');
+
+  const pagEl = document.getElementById('paginationContainer');
+  if (totalPages > 1) {
+    pagEl.style.display = 'flex';
+    pagEl.innerHTML = `
+      <button class="page-btn" onclick="changePage(${currentPage-1})" ${currentPage===1?'disabled':''}><i class="ti ti-chevron-left"></i></button>
+      ${Array.from({length:totalPages},(_,i)=>`<button class="page-btn ${i+1===currentPage?'active':''}" onclick="changePage(${i+1})">${i+1}</button>`).join('')}
+      <button class="page-btn" onclick="changePage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}><i class="ti ti-chevron-right"></i></button>
+    `;
+  } else { pagEl.style.display = 'none'; }
+}
+
+function changePage(p) {
+  currentPage = p; renderListings();
+  document.getElementById('listingsContainer').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// Alert system
+function openAlertModal() { show('alertModal'); }
+function closeAlertModal(e) {
+  if (!e || e.target === document.getElementById('alertModal')) hide('alertModal');
+}
+
+function saveAlert() {
+  const email = document.getElementById('alertEmail').value.trim();
+  const type = document.getElementById('alertType').value;
+  const region = document.getElementById('alertRegion').value;
+  const budget = document.getElementById('alertBudget').value;
+  const freq = document.getElementById('alertFreq').value;
+
+  if (!email) { alert('Veuillez entrer une adresse email.'); return; }
+
+  const alert = { id: Date.now(), email, type, region, budget, freq, createdAt: new Date().toISOString() };
+  savedAlerts.push(alert);
+  localStorage.setItem('immo_alerts', JSON.stringify(savedAlerts));
+
+  hide('alertModal');
+  renderAlerts();
+
+  const desc = [type||'tous biens', region||'tout Luxembourg', budget ? 'max '+formatPrice(parseInt(budget)) : ''].filter(Boolean).join(' · ');
+  const freqLabel = { instant:'immédiatement', daily:'résumé quotidien', weekly:'résumé hebdomadaire' }[freq];
+  document.getElementById('alertSuccessText').innerHTML = `<strong>Alerte créée !</strong> Vous recevrez un email à <strong>${email}</strong> (${freqLabel}) pour : ${desc}.`;
+  show('alertSuccess');
+  setTimeout(() => hide('alertSuccess'), 6000);
+}
+
+function deleteAlert(id) {
+  savedAlerts = savedAlerts.filter(a => a.id !== id);
+  localStorage.setItem('immo_alerts', JSON.stringify(savedAlerts));
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const container = document.getElementById('activeAlerts');
+  const list = document.getElementById('alertsList');
+  if (!savedAlerts.length) { container.style.display = 'none'; return; }
+
+  container.style.display = 'block';
+  const freqLabel = { instant:'immédiat', daily:'quotidien', weekly:'hebdo' };
+  list.innerHTML = savedAlerts.map(a => {
+    const desc = [a.type||'Tous biens', a.region||'Tout Luxembourg', a.budget ? 'max '+formatPrice(parseInt(a.budget)) : ''].filter(Boolean).join(' · ');
+    return `<div class="alert-item">
+      <div>
+        <div style="font-size:12px;font-weight:500">${desc}</div>
+        <div class="alert-item-desc">${a.email} · ${freqLabel[a.freq]||a.freq}</div>
+      </div>
+      <button class="alert-delete" onclick="deleteAlert(${a.id})" aria-label="Supprimer l'alerte"><i class="ti ti-trash" aria-hidden="true"></i></button>
+    </div>`;
+  }).join('');
+}
+
+renderAlerts();
+</script>
+</body>
+</html>
