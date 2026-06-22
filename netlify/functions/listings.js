@@ -36,17 +36,13 @@ exports.handler = async (event) => {
     const stateStart = html.indexOf('window.__INITIAL_STATE__=');
     if (stateStart === -1) throw new Error('Could not find __INITIAL_STATE__');
     const stateEnd = html.indexOf('</script>', stateStart);
-    const stateJson = html.substring(stateStart + 25, stateEnd);
+    // Trim trailing ; and whitespace before </script>
+    let stateJson = html.substring(stateStart + 25, stateEnd).trimEnd();
+    if (stateJson.endsWith(';')) stateJson = stateJson.slice(0, -1);
 
-    // Parse JSON (handle undefined values from server)
-    let state;
-    try {
-      state = JSON.parse(stateJson);
-    } catch {
-      // Replace undefined values
-      const cleaned = stateJson.replace(/:undefined/g, ':null');
-      state = JSON.parse(cleaned);
-    }
+    // Parse JSON — replace undefined values injected by SSR
+    const cleaned = stateJson.replace(/:undefined(?=[,}\]])/g, ':null');
+    const state = JSON.parse(cleaned);
 
     const list = state?.search?.list || [];
 
