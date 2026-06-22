@@ -518,7 +518,7 @@ Prix réalistes LU : maisons 600k-2M€, appartements 400k-900k€. 20% isNew. V
     const resp = await fetch('/.netlify/functions/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
     });
     const rawText = await resp.text();
     if (!rawText) throw new Error('La fonction serveur n\'a renvoyé aucune réponse (status ' + resp.status + ')');
