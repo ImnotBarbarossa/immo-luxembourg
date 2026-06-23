@@ -178,6 +178,7 @@ exports.handler = async (event) => {
     athome: athomeList.length,
     immoweb: immoweb_list.length,
     wort: wortList.length,
+    v: 'v3-json-api',
     errors: {
       athome: athome.status === 'rejected' ? athome.reason?.message : null,
       immoweb: immoweb.status === 'rejected' ? immoweb.reason?.message : null,
