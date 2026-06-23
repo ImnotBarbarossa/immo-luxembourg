@@ -1,7 +1,7 @@
 {
   "functions": {
-    "api/listings.js": { "maxDuration": 15 },
-    "api/claude.js": { "maxDuration": 15 }
+    "api/listings.js": { "maxDuration": 10 },
+    "api/claude.js": { "maxDuration": 10 }
   },
   "headers": [
     {
