@@ -62,10 +62,10 @@ async function fetchAthome({ type, region, budget }) {
   }
 }
 
-async function fetchImmoweb({ type, budget }) {
+async function fetchImmoweb({ type, region, budget }) {
   const propType = type === 'Appartement' ? 'APARTMENT' : type === 'Terrain' ? 'LAND' : 'HOUSE';
-  // size=10 keeps response smaller → faster under 10s Vercel timeout
-  const apiUrl = `${IMMOWEB_BASE}/fr/search-results?countries=LU&transactionTypes=FOR_SALE&propertyTypes=${propType}&orderBy=newest&size=10&page=1`;
+  // Fetch more results so client-side locality filter has enough candidates
+  const apiUrl = `${IMMOWEB_BASE}/fr/search-results?countries=LU&transactionTypes=FOR_SALE&propertyTypes=${propType}&orderBy=newest&size=30&page=1`;
 
   const { signal, clear } = timeout(7000);
   try {
@@ -82,7 +82,20 @@ async function fetchImmoweb({ type, budget }) {
     const data = await resp.json();
     clear();
 
-    const results = data.results || [];
+    let results = data.results || [];
+
+    // Client-side locality filter: immoweb API doesn't support commune filtering
+    if (region) {
+      const regionNorm = region.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      const filtered = results.filter((item) => {
+        const loc = (item.property?.location?.locality || '').toLowerCase()
+          .normalize('NFD').replace(/[̀-ͯ]/g, '');
+        return loc.includes(regionNorm) || regionNorm.includes(loc);
+      });
+      // Only apply filter if it returns results; otherwise keep all (user searched a district/canton)
+      if (filtered.length > 0) results = filtered;
+    }
+
     return results.slice(0, 12).map((item) => {
       const prop = item.property || {};
       const price = item.price?.mainValue || item.transaction?.sale?.price || 0;
@@ -107,7 +120,6 @@ async function fetchImmoweb({ type, budget }) {
         source: 'immoweb',
         isNew: daysAgo <= 3,
         daysAgo,
-        // Short URL /fr/annonce/{id} always redirects to the correct listing page
         url: `${IMMOWEB_BASE}/fr/annonce/${item.id}`,
         image: item.media?.pictures?.[0]?.mediumUrl || item.media?.pictures?.[0]?.smallUrl || null,
       };
@@ -127,7 +139,7 @@ module.exports = async function handler(req, res) {
 
   const [athome, immoweb] = await Promise.allSettled([
     fetchAthome({ type, region, budget }),
-    fetchImmoweb({ type, budget }),
+    fetchImmoweb({ type, region, budget }),
   ]);
 
   const athomeList = athome.status === 'fulfilled' ? athome.value : [];
