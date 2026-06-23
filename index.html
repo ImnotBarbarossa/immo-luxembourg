@@ -562,7 +562,7 @@ async function doSearch() {
   }
 
   try {
-    const resp = await fetch('/.netlify/functions/listings', {
+    const resp = await fetch('/api/listings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, region, budget })
