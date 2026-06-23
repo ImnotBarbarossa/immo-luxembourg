@@ -55,65 +55,56 @@ async function fetchAthome({ type, region, budget }) {
   });
 }
 
-// ── immoweb.be (Luxembourg) ──────────────────────────────────────────────────
+// ── immoweb.be (Luxembourg) via JSON search-results endpoint ─────────────────
 async function fetchImmoweb({ type, budget }) {
-  const typeParam = type === 'Appartement' ? 'appartement' : type === 'Terrain' ? 'terrain' : 'maison';
-  const url = `${IMMOWEB_BASE}/fr/recherche/${typeParam}/a-vendre/luxembourg?orderBy=newest`;
-  const resp = await fetch(url, { headers: HEADERS });
-  const html = await resp.text();
+  const propType = type === 'Appartement' ? 'APARTMENT' : type === 'Terrain' ? 'LAND' : 'HOUSE';
+  const apiUrl = `${IMMOWEB_BASE}/fr/search-results?countries=LU&transactionTypes=FOR_SALE&propertyTypes=${propType}&orderBy=newest&size=20&page=1`;
 
-  // Extract window.search = { ... }
-  const marker = 'window.search = ';
-  const idx = html.indexOf(marker);
-  if (idx === -1) return [];
-  const start = idx + marker.length;
-  let depth = 0, i = start;
-  while (i < html.length && i < start + 500000) {
-    const c = html[i];
-    if (c === '{' || c === '[') depth++;
-    else if (c === '}' || c === ']') { depth--; if (depth <= 0) { i++; break; } }
-    else if (depth === 0 && (c === ';' || c === '\n')) break;
-    i++;
-  }
-  let raw = html.substring(start, i).trim();
-  if (raw.endsWith(';')) raw = raw.slice(0, -1);
+  const resp = await fetch(apiUrl, {
+    headers: {
+      'User-Agent': HEADERS['User-Agent'],
+      'Accept': 'application/json, text/javascript, */*; q=0.01',
+      'Accept-Language': 'fr-FR,fr;q=0.9',
+      'Referer': `${IMMOWEB_BASE}/fr/recherche/maison/a-vendre/luxembourg`,
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+  });
 
-  let search;
-  try { search = JSON.parse(raw); } catch { return []; }
+  const data = await resp.json();
+  const results = data.results || [];
 
-  const classifieds = search?.classifieds || search?.results || [];
-  return classifieds.slice(0, 12).filter(c => c).map((c) => {
-    const prop = c.property || c;
-    const price = prop.price?.mainValue || prop.price || 0;
-    const publishedAt = c.publishedAt || c.lastModificationDate;
-    const daysAgo = publishedAt
-      ? Math.max(0, Math.round((Date.now() - new Date(publishedAt)) / 86400000))
+  return results.slice(0, 12).map((item) => {
+    const prop = item.property || {};
+    const price = item.price?.mainValue || item.cluster?.minPrice || 0;
+    const pubDate = item.publication?.lastModificationDate || item.publication?.publicationDate;
+    const daysAgo = pubDate
+      ? Math.max(0, Math.round((Date.now() - new Date(pubDate)) / 86400000))
       : 99;
-    const id = c.id || c.classified?.id || Math.random();
-    const city = prop.location?.locality || prop.locality || 'Luxembourg';
+    if (budget && price && price > budget) return null;
+
+    const city = prop.location?.locality || 'Luxembourg';
     const surface = prop.netHabitableSurface || prop.totalSurface || prop.landSurface || 0;
-    const rooms = prop.roomCount || 0;
-    const bedrooms = prop.bedroomCount || 0;
-    const typeLabel = prop.type === 'APARTMENT' ? 'Appartement' : prop.type === 'LAND' ? 'Terrain' : 'Maison';
-    const slug = c.id ? `/${c.id}` : '';
-    const photo = (prop.photos || prop.images || [])[0];
-    const imgUrl = photo?.url || photo?.uri || (typeof photo === 'string' ? photo : null);
-    const budgetOk = !budget || !price || price <= budget;
-    if (!budgetOk) return null;
+    const propTypeLabel = prop.type === 'APARTMENT' ? 'Appartement' : prop.type === 'LAND' ? 'Terrain' : 'Maison';
+    const imgUrl = item.media?.pictures?.[0]?.smallUrl || item.media?.pictures?.[0]?.mediumUrl || null;
+    // Build listing URL: /fr/annonce/{type}/{locality}/{postalCode}/{id}
+    const locality = (prop.location?.locality || 'luxembourg').toLowerCase().replace(/\s+/g, '-');
+    const zip = prop.location?.postalCode || '';
+    const listingUrl = `${IMMOWEB_BASE}/fr/annonce/${propTypeLabel.toLowerCase()}/${locality}/${zip}/${item.id}`;
+
     return {
-      id: `iw-${id}`,
-      title: c.description || `${typeLabel} - ${city}`,
-      type: typeLabel,
+      id: `iw-${item.id}`,
+      title: `${propTypeLabel} - ${city}`,
+      type: propTypeLabel,
       location: city,
       price,
       surface,
-      rooms,
-      bedrooms,
+      rooms: prop.roomCount || 0,
+      bedrooms: prop.bedroomCount || 0,
       source: 'immoweb',
       isNew: daysAgo <= 3,
       daysAgo,
-      url: slug ? `${IMMOWEB_BASE}/fr/annonce${slug}` : url,
-      image: imgUrl || null,
+      url: item.id ? listingUrl : apiUrl,
+      image: imgUrl,
     };
   }).filter(Boolean);
 }
