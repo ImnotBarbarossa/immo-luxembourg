@@ -7,41 +7,57 @@ const HEADERS = {
 exports.handler = async () => {
   const results = {};
 
-  // 1. Analyze remax.lu JS bundle for API endpoints
+  // 1. Remax: find main app bundle via runtime.js chunk manifest
   try {
-    const mainJs = await fetch('https://www.remax.lu/static/js/vendors-main~cdd60c62.ade39ff9.js', { headers: HEADERS });
-    const js = await mainJs.text();
-    const apiPaths = [...js.matchAll(/["'](https?:\/\/[^"']+api[^"']{0,60})["']/g)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).slice(0, 15);
-    const endpoints = [...js.matchAll(/["'](\/api\/[^"']{0,60})["']/g)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).slice(0, 15);
-    results.remax_js = { size: js.length, apiPaths, endpoints };
-  } catch(e) { results.remax_js = { error: e.message }; }
-
-  // Also try the main chunk
-  try {
-    const r = await fetch('https://www.remax.lu/static/js/vendors-main~f82e0cd2.967ba1ac.js', { headers: HEADERS });
+    const r = await fetch('https://www.remax.lu/static/js/runtime.a2753db5.js', { headers: HEADERS });
     const js = await r.text();
-    const apiPaths = [...js.matchAll(/["'](https?:\/\/[^"']*remax[^"']{0,80})["']/g)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).slice(0, 10);
-    results.remax_main_chunk = { size: js.length, remaxUrls: apiPaths };
-  } catch(e) { results.remax_main_chunk = { error: e.message }; }
+    // Chunk hashes are in the runtime manifest
+    const chunks = [...js.matchAll(/["']([a-f0-9]{8})["']/g)].map(m => m[1]).slice(0, 10);
+    results.remax_runtime = { size: js.length, chunks, preview: js.substring(0, 500) };
+  } catch(e) { results.remax_runtime = { error: e.message }; }
 
-  // 2. Check belgoimmo.be for Luxembourg listings
-  try {
-    const r = await fetch('https://www.belgoimmo.be/luxembourg/acheter', { headers: HEADERS });
-    const html = await r.text();
-    const hasListings = html.includes('price') || html.includes('prix') || html.includes('surface');
-    const links = [...html.matchAll(/href="([^"]+luxembourg[^"]+)"/g)].map(m => m[1]).slice(0, 10);
-    results.belgoimmo = { status: r.status, size: html.length, hasListings, links, preview: html.substring(0, 500) };
-  } catch(e) { results.belgoimmo = { error: e.message }; }
-
-  // 3. Try century21.lu with different paths
-  const c21urls = ['https://www.century21.lu/fr/acheter/', 'https://www.century21.lu/fr/annonces/', 'https://century21.lu/acheter/'];
-  results.century21 = [];
-  for (const url of c21urls) {
+  // 2. Remax: try their likely search API endpoints
+  const remaxApis = [
+    'https://www.remax.lu/api/v1/properties?transaction=buy&country=LU&size=5',
+    'https://api.remax.lu/properties?transaction=buy&country=LU',
+    'https://www.remax.lu/api/search?transaction=buy&q=Luxembourg',
+    'https://www.remax.lu/api/properties/search?country=LU&buy=true',
+  ];
+  results.remax_apis = [];
+  for (const url of remaxApis) {
     try {
-      const r = await fetch(url, { headers: HEADERS, redirect: 'follow' });
+      const r = await fetch(url, { headers: { ...HEADERS, Accept: 'application/json' }, redirect: 'follow' });
       const text = await r.text();
-      results.century21.push({ url, status: r.status, size: text.length, preview: text.substring(0, 200) });
-    } catch(e) { results.century21.push({ url, error: e.message }); }
+      results.remax_apis.push({ url, status: r.status, size: text.length, preview: text.substring(0, 200) });
+    } catch(e) { results.remax_apis.push({ url, error: e.message }); }
+  }
+
+  // 3. Century21.lu: check if Next.js with __NEXT_DATA__
+  try {
+    const r = await fetch('https://www.century21.lu/fr/acheter/', { headers: HEADERS });
+    const html = await r.text();
+    const nextDataIdx = html.indexOf('__NEXT_DATA__');
+    const hasNext = nextDataIdx >= 0;
+    const nextPreview = hasNext ? html.substring(nextDataIdx, nextDataIdx + 500) : '';
+    // Try _next/data endpoint
+    const buildIdMatch = html.match(/"buildId"\s*:\s*"([^"]+)"/);
+    const buildId = buildIdMatch ? buildIdMatch[1] : null;
+    results.century21 = { status: r.status, size: html.length, hasNext, buildId, nextPreview };
+  } catch(e) { results.century21 = { error: e.message }; }
+
+  // 4. Try wort.lu immo with different URL
+  const wortUrls = [
+    'https://immo.wort.lu/fr/annonces/vente',
+    'https://www.wort.lu/immobilier/vente',
+    'https://immo.wort.lu/api/listings?type=vente',
+  ];
+  results.wort = [];
+  for (const url of wortUrls) {
+    try {
+      const r = await fetch(url, { headers: HEADERS });
+      const text = await r.text();
+      results.wort.push({ url, status: r.status, size: text.length, preview: text.substring(0, 200) });
+    } catch(e) { results.wort.push({ url, error: e.message.substring(0, 60) }); }
   }
 
   return {
