@@ -461,7 +461,7 @@
 let allListings = [];
 let currentPage = 1;
 const PER_PAGE = 8;
-let activeSources = new Set(['athome','immoweb','wort']);
+let activeSources = new Set(['athome','immoweb']);
 let savedAlerts = JSON.parse(localStorage.getItem('immo_alerts') || '[]');
 
 const sourceLabels = { athome:'Athome.lu', immoweb:'Immoweb.be', wort:'Wort.lu', immotop:'Immotop.lu', remax:'RE/MAX', logicimmo:'Logic-immo.lu', era:'ERA Luxembourg' };
