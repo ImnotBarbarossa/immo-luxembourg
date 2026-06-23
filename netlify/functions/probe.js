@@ -5,39 +5,51 @@ const HEADERS = {
 };
 
 exports.handler = async () => {
-  const tests = [
-    // Sites with Luxembourg listings
-    { name: 'seloger_lu',      url: 'https://www.seloger.com/immobilier/achat/luxembourg/' },
-    { name: 'logicimmo_com',   url: 'https://www.logic-immo.com/vente-immobilier-luxembourg/' },
-    { name: 'immoweb_lu',      url: 'https://www.immoweb.be/fr/recherche/maison/a-vendre/luxembourg' },
-    { name: 'bienici_lu',      url: 'https://www.bienici.com/recherche/achat/luxembourg' },
-    { name: 'lux_remax_search',url: 'https://www.remax.lu/buy/?countryId=LU' },
-    // Try athome.lu with different search params - houses specifically
-    { name: 'athome_maison',   url: 'https://www.athome.lu/srp/?tr=buy&q=Luxembourg&idtype[]=2' },
-    { name: 'athome_appart',   url: 'https://www.athome.lu/srp/?tr=buy&q=Luxembourg&idtype[]=1' },
-    // Try remax.lu search directly with params in URL
-    { name: 'remax_search',    url: 'https://www.remax.lu/buy/?country=LU&transaction=buy' },
-    // Try ERA with different path
-    { name: 'era_fr',          url: 'https://www.era.lu/fr/acheter/' },
-    { name: 'era_api',         url: 'https://www.era.lu/api/properties?country=LU&transaction=buy' },
-  ];
+  const results = {};
 
-  const results = await Promise.all(tests.map(async (t) => {
+  // 1. Deep-dive immoweb.be Luxembourg
+  try {
+    const r = await fetch('https://www.immoweb.be/fr/recherche/maison/a-vendre/luxembourg', { headers: HEADERS });
+    const html = await r.text();
+
+    const hasInitial = html.includes('__INITIAL_STATE__');
+    const hasNext = html.includes('__NEXT_DATA__');
+    const hasNuxt = html.includes('__NUXT__');
+
+    // Find embedded JSON keys
+    const jsonBlocks = [...html.matchAll(/<script[^>]*type="application\/json"[^>]*>([\s\S]{0,500})<\/script>/g)].map(m => m[1].substring(0, 200));
+    const scriptVars = [...html.matchAll(/window\.(\w+)\s*=/g)].map(m => m[1]).slice(0, 20);
+
+    // Look for listing data patterns
+    const priceMatches = [...html.matchAll(/"price"\s*:\s*\{[^}]{0,100}\}/g)].slice(0, 3).map(m => m[0]);
+    const idMatches = [...html.matchAll(/"id"\s*:\s*(\d{6,})/g)].map(m => m[1]).slice(0, 5);
+
+    // Find API URLs
+    const apiUrls = [...html.matchAll(/["'](https:\/\/[^"']*immoweb[^"']{0,80})["']/g)].map(m => m[1]).filter((v,i,a) => a.indexOf(v) === i).slice(0, 10);
+
+    results.immoweb = {
+      status: r.status, size: html.length,
+      hasInitial, hasNext, hasNuxt,
+      scriptVars, jsonBlocks: jsonBlocks.slice(0, 3),
+      priceMatches, idMatches, apiUrls,
+      preview: html.substring(0, 500),
+    };
+  } catch(e) { results.immoweb = { error: e.message }; }
+
+  // 2. Try immoweb search API directly
+  const immowebApis = [
+    'https://www.immoweb.be/fr/recherche/maison/a-vendre/luxembourg?orderBy=newest',
+    'https://api.immoweb.be/classifieds/search?countries=LU&transactionTypes=FOR_SALE&size=5',
+    'https://www.immoweb.be/api/classifieds/search?countries=LU&transactionTypes=FOR_SALE',
+  ];
+  results.immoweb_apis = [];
+  for (const url of immowebApis) {
     try {
-      const r = await fetch(t.url, { headers: HEADERS, redirect: 'follow' });
+      const r = await fetch(url, { headers: { ...HEADERS, Accept: 'application/json' } });
       const text = await r.text();
-      return {
-        name: t.name, status: r.status, size: text.length,
-        hasInitialState: text.includes('__INITIAL_STATE__'),
-        hasNextData: text.includes('__NEXT_DATA__'),
-        hasNuxt: text.includes('__NUXT__'),
-        hasPrice: text.includes('"price"') || text.includes('data-price'),
-        preview: text.substring(0, 200),
-      };
-    } catch(e) {
-      return { name: t.name, error: e.message.substring(0, 80) };
-    }
-  }));
+      results.immoweb_apis.push({ url, status: r.status, size: text.length, preview: text.substring(0, 300) });
+    } catch(e) { results.immoweb_apis.push({ url, error: e.message.substring(0, 60) }); }
+  }
 
   return {
     statusCode: 200,
