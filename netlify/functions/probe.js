@@ -4,48 +4,49 @@ const HEADERS = {
   'Accept-Language': 'fr-FR,fr;q=0.9',
 };
 
-const MORE_SITES = [
-  { name: 'remax_detail',   url: 'https://www.remax.lu/buy/' },
-  { name: 'century21',      url: 'https://www.century21.lu/acheter/' },
-  { name: 'property.lu',    url: 'https://www.property.lu/en/buy' },
-  { name: 'luxresidence',   url: 'https://www.luxresidence.lu/en/buy' },
-  { name: 'atoffice',       url: 'https://www.atoffice.lu/vente/' },
-  { name: 'belgoimmo',      url: 'https://www.belgoimmo.be/luxembourg/acheter' },
-  { name: 'zimmo',          url: 'https://www.zimmo.lu/fr/maisons-a-vendre/' },
-  { name: 'immo365',        url: 'https://www.immo365.lu/vente' },
-  { name: 'remax_api',      url: 'https://www.remax.lu/api/properties?transaction=buy&country=lu&limit=5' },
-  { name: 'remax_api2',     url: 'https://www.remax.lu/api/listings?type=buy&limit=5' },
-  { name: 'remax_graphql',  url: 'https://www.remax.lu/graphql' },
-];
-
 exports.handler = async () => {
-  // First get the full remax.lu HTML to analyze
-  let remaxContent = '';
+  const results = {};
+
+  // 1. Analyze remax.lu JS bundle for API endpoints
   try {
-    const r = await fetch('https://www.remax.lu/buy/', { headers: HEADERS });
-    remaxContent = await r.text();
-  } catch(e) {}
+    const mainJs = await fetch('https://www.remax.lu/static/js/vendors-main~cdd60c62.ade39ff9.js', { headers: HEADERS });
+    const js = await mainJs.text();
+    const apiPaths = [...js.matchAll(/["'](https?:\/\/[^"']+api[^"']{0,60})["']/g)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).slice(0, 15);
+    const endpoints = [...js.matchAll(/["'](\/api\/[^"']{0,60})["']/g)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).slice(0, 15);
+    results.remax_js = { size: js.length, apiPaths, endpoints };
+  } catch(e) { results.remax_js = { error: e.message }; }
 
-  const remaxScripts = [...remaxContent.matchAll(/src="([^"]+\.js[^"]*)"/g)].map(m => m[1]).slice(0, 5);
-  const remaxApiHints = [...remaxContent.matchAll(/["'](\/api\/[^"']+)["']/g)].map(m => m[1]).slice(0, 10);
-  const remaxEnv = remaxContent.includes('__NEXT_DATA__') ? 'Next.js'
-    : remaxContent.includes('__NUXT__') ? 'Nuxt'
-    : remaxContent.includes('window.__') ? 'SPA/custom'
-    : 'unknown';
+  // Also try the main chunk
+  try {
+    const r = await fetch('https://www.remax.lu/static/js/vendors-main~f82e0cd2.967ba1ac.js', { headers: HEADERS });
+    const js = await r.text();
+    const apiPaths = [...js.matchAll(/["'](https?:\/\/[^"']*remax[^"']{0,80})["']/g)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).slice(0, 10);
+    results.remax_main_chunk = { size: js.length, remaxUrls: apiPaths };
+  } catch(e) { results.remax_main_chunk = { error: e.message }; }
 
-  const results = await Promise.all(MORE_SITES.map(async (site) => {
+  // 2. Check belgoimmo.be for Luxembourg listings
+  try {
+    const r = await fetch('https://www.belgoimmo.be/luxembourg/acheter', { headers: HEADERS });
+    const html = await r.text();
+    const hasListings = html.includes('price') || html.includes('prix') || html.includes('surface');
+    const links = [...html.matchAll(/href="([^"]+luxembourg[^"]+)"/g)].map(m => m[1]).slice(0, 10);
+    results.belgoimmo = { status: r.status, size: html.length, hasListings, links, preview: html.substring(0, 500) };
+  } catch(e) { results.belgoimmo = { error: e.message }; }
+
+  // 3. Try century21.lu with different paths
+  const c21urls = ['https://www.century21.lu/fr/acheter/', 'https://www.century21.lu/fr/annonces/', 'https://century21.lu/acheter/'];
+  results.century21 = [];
+  for (const url of c21urls) {
     try {
-      const r = await fetch(site.url, { headers: HEADERS, redirect: 'follow' });
+      const r = await fetch(url, { headers: HEADERS, redirect: 'follow' });
       const text = await r.text();
-      return { name: site.name, status: r.status, size: text.length, preview: text.substring(0, 300) };
-    } catch (e) {
-      return { name: site.name, error: e.message };
-    }
-  }));
+      results.century21.push({ url, status: r.status, size: text.length, preview: text.substring(0, 200) });
+    } catch(e) { results.century21.push({ url, error: e.message }); }
+  }
 
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ remaxEnv, remaxScripts, remaxApiHints, remaxSize: remaxContent.length, sites: results }, null, 2),
+    body: JSON.stringify(results, null, 2),
   };
 };
