@@ -87,13 +87,11 @@ async function fetchImmoweb({ type, region, budget }) {
     // Client-side locality filter: immoweb API doesn't support commune filtering
     if (region) {
       const regionNorm = region.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-      const filtered = results.filter((item) => {
+      results = results.filter((item) => {
         const loc = (item.property?.location?.locality || '').toLowerCase()
           .normalize('NFD').replace(/[̀-ͯ]/g, '');
         return loc.includes(regionNorm) || regionNorm.includes(loc);
       });
-      // Only apply filter if it returns results; otherwise keep all (user searched a district/canton)
-      if (filtered.length > 0) results = filtered;
     }
 
     return results.slice(0, 12).map((item) => {
