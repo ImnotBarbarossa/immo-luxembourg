@@ -85,15 +85,20 @@ async function fetchImmoweb({ type, budget }) {
     const city = prop.location?.locality || 'Luxembourg';
     const surface = prop.netHabitableSurface || prop.totalSurface || prop.landSurface || 0;
     const propTypeLabel = prop.type === 'APARTMENT' ? 'Appartement' : prop.type === 'LAND' ? 'Terrain' : 'Maison';
-    const imgUrl = item.media?.pictures?.[0]?.smallUrl || item.media?.pictures?.[0]?.mediumUrl || null;
+    const imgUrl = item.media?.pictures?.[0]?.mediumUrl || item.media?.pictures?.[0]?.smallUrl || null;
     // Build listing URL: /fr/annonce/{type}/{locality}/{postalCode}/{id}
-    const locality = (prop.location?.locality || 'luxembourg').toLowerCase().replace(/\s+/g, '-');
+    const slug = (prop.location?.locality || 'luxembourg')
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')  // remove accents
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const zip = prop.location?.postalCode || '';
-    const listingUrl = `${IMMOWEB_BASE}/fr/annonce/${propTypeLabel.toLowerCase()}/${locality}/${zip}/${item.id}`;
+    const typeSlugFr = prop.type === 'APARTMENT' ? 'appartement' : prop.type === 'LAND' ? 'terrain' : 'maison';
+    const listingUrl = `${IMMOWEB_BASE}/fr/annonce/${typeSlugFr}/${slug}/${zip}/${item.id}`;
+    const title = prop.title || `${propTypeLabel} - ${city}`;
 
     return {
       id: `iw-${item.id}`,
-      title: `${propTypeLabel} - ${city}`,
+      title,
       type: propTypeLabel,
       location: city,
       price,
