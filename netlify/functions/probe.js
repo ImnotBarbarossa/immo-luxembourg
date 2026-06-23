@@ -7,39 +7,16 @@ const HEADERS = {
 };
 
 exports.handler = async () => {
-  const results = {};
+  const url = 'https://www.immoweb.be/fr/search-results?countries=LU&transactionTypes=FOR_SALE&propertyTypes=HOUSE&orderBy=newest&size=5&page=1';
+  const r = await fetch(url, { headers: HEADERS });
+  const data = await r.json();
 
-  // Test the immoweb JSON search endpoint
-  const apiBase = 'https://www.immoweb.be/fr/search-results';
-
-  const testUrls = [
-    `${apiBase}?countries=LU&transactionTypes=FOR_SALE&propertyTypes=HOUSE&orderBy=newest&size=5&page=1`,
-    `${apiBase}?countries=LU&transactionTypes=FOR_SALE&orderBy=newest&size=5&page=1`,
-  ];
-
-  results.immowebApi = [];
-  for (const url of testUrls) {
-    try {
-      const r = await fetch(url, { headers: HEADERS });
-      const text = await r.text();
-      const isJson = text.trim().startsWith('{') || text.trim().startsWith('[');
-      let parsed = null;
-      if (isJson) {
-        try { parsed = JSON.parse(text); } catch {}
-      }
-      results.immowebApi.push({
-        url, status: r.status, size: text.length, isJson,
-        keys: parsed ? Object.keys(parsed).slice(0, 15) : null,
-        totalCount: parsed?.totalCount || parsed?.total,
-        resultCount: Array.isArray(parsed?.results) ? parsed.results.length : (Array.isArray(parsed?.classifieds) ? parsed.classifieds.length : null),
-        preview: text.substring(0, 600),
-      });
-    } catch(e) { results.immowebApi.push({ url, error: e.message.substring(0, 100) }); }
-  }
+  // Return the first 2 results fully so we can understand the structure
+  const sample = (data.results || []).slice(0, 2);
 
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(results, null, 2),
+    body: JSON.stringify({ totalItems: data.totalItems, currentPage: data.currentPage, sample }, null, 2),
   };
 };
