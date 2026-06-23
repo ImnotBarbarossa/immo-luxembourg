@@ -7,48 +7,59 @@ const HEADERS = {
 exports.handler = async () => {
   const results = {};
 
-  // 1. Deep-dive immoweb.be Luxembourg
-  try {
-    const r = await fetch('https://www.immoweb.be/fr/recherche/maison/a-vendre/luxembourg', { headers: HEADERS });
-    const html = await r.text();
+  // Fetch immoweb page
+  const r = await fetch('https://www.immoweb.be/fr/recherche/maison/a-vendre/luxembourg?orderBy=newest', { headers: HEADERS });
+  const html = await r.text();
 
-    const hasInitial = html.includes('__INITIAL_STATE__');
-    const hasNext = html.includes('__NEXT_DATA__');
-    const hasNuxt = html.includes('__NUXT__');
+  // Extract all window.xxx = {...} assignments
+  const windowVars = {};
+  for (const varName of ['search', 'urls', 'iwb', 'translations', 'locale']) {
+    const regex = new RegExp(`window\\.${varName}\\s*=\\s*`);
+    const idx = html.search(regex);
+    if (idx >= 0) {
+      const start = html.indexOf('=', idx) + 1;
+      // Find the end of the assignment (matching braces/brackets or end of statement)
+      let depth = 0, i = start;
+      while (i < html.length && i < start + 100000) {
+        const c = html[i];
+        if (c === '{' || c === '[') depth++;
+        else if (c === '}' || c === ']') { depth--; if (depth <= 0) { i++; break; } }
+        else if (depth === 0 && c === ';') break;
+        i++;
+      }
+      const raw = html.substring(start, i).trim();
+      try { windowVars[varName] = JSON.parse(raw.endsWith(';') ? raw.slice(0,-1) : raw); }
+      catch { windowVars[varName] = raw.substring(0, 500); }
+    }
+  }
 
-    // Find embedded JSON keys
-    const jsonBlocks = [...html.matchAll(/<script[^>]*type="application\/json"[^>]*>([\s\S]{0,500})<\/script>/g)].map(m => m[1].substring(0, 200));
-    const scriptVars = [...html.matchAll(/window\.(\w+)\s*=/g)].map(m => m[1]).slice(0, 20);
+  // Extract from window.search: listing count and API info
+  const search = windowVars.search || {};
+  const urls = windowVars.urls || {};
 
-    // Look for listing data patterns
-    const priceMatches = [...html.matchAll(/"price"\s*:\s*\{[^}]{0,100}\}/g)].slice(0, 3).map(m => m[0]);
-    const idMatches = [...html.matchAll(/"id"\s*:\s*(\d{6,})/g)].map(m => m[1]).slice(0, 5);
+  results.windowSearch = typeof search === 'object' ? {
+    keys: Object.keys(search).slice(0, 20),
+    totalCount: search.totalCount,
+    classifieds: Array.isArray(search.classifieds) ? search.classifieds.slice(0, 2) : 'not array',
+    results: Array.isArray(search.results) ? search.results.slice(0, 2) : 'not array',
+    snippet: JSON.stringify(search).substring(0, 1000),
+  } : search;
 
-    // Find API URLs
-    const apiUrls = [...html.matchAll(/["'](https:\/\/[^"']*immoweb[^"']{0,80})["']/g)].map(m => m[1]).filter((v,i,a) => a.indexOf(v) === i).slice(0, 10);
+  results.windowUrls = typeof urls === 'object' ? Object.keys(urls).slice(0, 20) : String(urls).substring(0, 300);
 
-    results.immoweb = {
-      status: r.status, size: html.length,
-      hasInitial, hasNext, hasNuxt,
-      scriptVars, jsonBlocks: jsonBlocks.slice(0, 3),
-      priceMatches, idMatches, apiUrls,
-      preview: html.substring(0, 500),
-    };
-  } catch(e) { results.immoweb = { error: e.message }; }
-
-  // 2. Try immoweb search API directly
-  const immowebApis = [
-    'https://www.immoweb.be/fr/recherche/maison/a-vendre/luxembourg?orderBy=newest',
-    'https://api.immoweb.be/classifieds/search?countries=LU&transactionTypes=FOR_SALE&size=5',
-    'https://www.immoweb.be/api/classifieds/search?countries=LU&transactionTypes=FOR_SALE',
+  // Try immoweb's classified API with correct format
+  const apiTests = [
+    'https://api.immoweb.be/classifieds/search?countries=LU&transactionTypes=FOR_SALE&propertyTypes=HOUSE&size=5&page=1',
+    'https://api.immoweb.be/classifieds?countries=LU&transactionTypes=FOR_SALE&size=5',
+    'https://www.immoweb.be/fr/recherche/maison/a-vendre/luxembourg?orderBy=newest&json=1',
   ];
-  results.immoweb_apis = [];
-  for (const url of immowebApis) {
+  results.apiTests = [];
+  for (const url of apiTests) {
     try {
-      const r = await fetch(url, { headers: { ...HEADERS, Accept: 'application/json' } });
-      const text = await r.text();
-      results.immoweb_apis.push({ url, status: r.status, size: text.length, preview: text.substring(0, 300) });
-    } catch(e) { results.immoweb_apis.push({ url, error: e.message.substring(0, 60) }); }
+      const ar = await fetch(url, { headers: { ...HEADERS, Accept: 'application/json', Referer: 'https://www.immoweb.be/' } });
+      const text = await ar.text();
+      results.apiTests.push({ url, status: ar.status, size: text.length, preview: text.substring(0, 400) });
+    } catch(e) { results.apiTests.push({ url, error: e.message.substring(0, 60) }); }
   }
 
   return {
