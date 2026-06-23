@@ -461,10 +461,10 @@
 let allListings = [];
 let currentPage = 1;
 const PER_PAGE = 8;
-let activeSources = new Set(['athome','immotop','remax','logicimmo','era']);
+let activeSources = new Set(['athome','immoweb','wort']);
 let savedAlerts = JSON.parse(localStorage.getItem('immo_alerts') || '[]');
 
-const sourceLabels = { athome:'Athome.lu', immotop:'Immotop.lu', remax:'RE/MAX', logicimmo:'Logic-immo.lu', era:'ERA Luxembourg' };
+const sourceLabels = { athome:'Athome.lu', immoweb:'Immoweb.be', wort:'Wort.lu', immotop:'Immotop.lu', remax:'RE/MAX', logicimmo:'Logic-immo.lu', era:'ERA Luxembourg' };
 const typeBg = { Maison:'#E1F5EE', Appartement:'#E6F1FB', Villa:'#FAECE7', Terrain:'#EAF3DE' };
 const typeEmoji = { Maison:'🏡', Appartement:'🏢', Villa:'🏛️', Terrain:'🌿' };
 
@@ -570,6 +570,21 @@ async function doSearch() {
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
     allListings = data.listings || [];
+
+    // Mark progress steps as done
+    if (data.sources) {
+      for (const [s, count] of Object.entries(data.sources)) {
+        if (s === 'errors') continue;
+        const el = document.getElementById('prog-'+s);
+        if (el) {
+          el.classList.remove('active');
+          el.classList.add(count > 0 ? 'done' : 'failed');
+          const span = el.querySelector('span');
+          if (span) span.textContent = count > 0 ? `${sourceLabels[s]||s} : ${count} annonces` : `${sourceLabels[s]||s} : indisponible`;
+        }
+      }
+    }
+    await new Promise(r => setTimeout(r, 600));
 
     hide('loadingState');
     document.getElementById('searchBtn').disabled = false;

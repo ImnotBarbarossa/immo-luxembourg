@@ -7,60 +7,71 @@ const HEADERS = {
 exports.handler = async () => {
   const results = {};
 
-  // Fetch immoweb page
-  const r = await fetch('https://www.immoweb.be/fr/recherche/maison/a-vendre/luxembourg?orderBy=newest', { headers: HEADERS });
-  const html = await r.text();
+  // 1. Extract window.urls from immoweb to find the real JSON search endpoint
+  try {
+    const r = await fetch('https://www.immoweb.be/fr/recherche/maison/a-vendre/luxembourg?orderBy=newest', { headers: HEADERS });
+    const html = await r.text();
 
-  // Extract all window.xxx = {...} assignments
-  const windowVars = {};
-  for (const varName of ['search', 'urls', 'iwb', 'translations', 'locale']) {
-    const regex = new RegExp(`window\\.${varName}\\s*=\\s*`);
-    const idx = html.search(regex);
+    const marker = 'window.urls = ';
+    const idx = html.indexOf(marker);
     if (idx >= 0) {
-      const start = html.indexOf('=', idx) + 1;
-      // Find the end of the assignment (matching braces/brackets or end of statement)
+      const start = idx + marker.length;
       let depth = 0, i = start;
-      while (i < html.length && i < start + 100000) {
+      while (i < html.length && i < start + 10000) {
         const c = html[i];
         if (c === '{' || c === '[') depth++;
         else if (c === '}' || c === ']') { depth--; if (depth <= 0) { i++; break; } }
-        else if (depth === 0 && c === ';') break;
+        else if (depth === 0 && (c === ';' || c === '\n')) break;
         i++;
       }
-      const raw = html.substring(start, i).trim();
-      try { windowVars[varName] = JSON.parse(raw.endsWith(';') ? raw.slice(0,-1) : raw); }
-      catch { windowVars[varName] = raw.substring(0, 500); }
+      const raw = html.substring(start, i).trim().replace(/;$/, '');
+      try {
+        const urls = JSON.parse(raw);
+        results.immoweb_urls = urls;
+        // Try the searchResultsJsonUrl
+        if (urls.searchResultsJsonUrl) {
+          const apiUrl = urls.searchResultsJsonUrl + '?countries=LU&transactionTypes=FOR_SALE&propertyTypes=HOUSE&orderBy=newest&size=5';
+          const ar = await fetch(apiUrl, { headers: { ...HEADERS, Referer: 'https://www.immoweb.be/' } });
+          const text = await ar.text();
+          results.searchApiTest = { url: apiUrl, status: ar.status, size: text.length, preview: text.substring(0, 500) };
+        }
+      } catch(e) { results.immoweb_urls_err = e.message; }
     }
-  }
+  } catch(e) { results.immoweb_err = e.message; }
 
-  // Extract from window.search: listing count and API info
-  const search = windowVars.search || {};
-  const urls = windowVars.urls || {};
-
-  results.windowSearch = typeof search === 'object' ? {
-    keys: Object.keys(search).slice(0, 20),
-    totalCount: search.totalCount,
-    classifieds: Array.isArray(search.classifieds) ? search.classifieds.slice(0, 2) : 'not array',
-    results: Array.isArray(search.results) ? search.results.slice(0, 2) : 'not array',
-    snippet: JSON.stringify(search).substring(0, 1000),
-  } : search;
-
-  results.windowUrls = typeof urls === 'object' ? Object.keys(urls).slice(0, 20) : String(urls).substring(0, 300);
-
-  // Try immoweb's classified API with correct format
-  const apiTests = [
-    'https://api.immoweb.be/classifieds/search?countries=LU&transactionTypes=FOR_SALE&propertyTypes=HOUSE&size=5&page=1',
-    'https://api.immoweb.be/classifieds?countries=LU&transactionTypes=FOR_SALE&size=5',
-    'https://www.immoweb.be/fr/recherche/maison/a-vendre/luxembourg?orderBy=newest&json=1',
+  // 2. Test wort.lu immo section
+  const wortUrls = [
+    'https://immo.wort.lu/fr/annonces/maison/vente',
+    'https://www.wort.lu/fr/immobilier/achat',
+    'https://immo.wort.lu/',
+    'https://immo.wort.lu/fr/',
   ];
-  results.apiTests = [];
-  for (const url of apiTests) {
+  results.wort_tests = [];
+  for (const url of wortUrls) {
     try {
-      const ar = await fetch(url, { headers: { ...HEADERS, Accept: 'application/json', Referer: 'https://www.immoweb.be/' } });
-      const text = await ar.text();
-      results.apiTests.push({ url, status: ar.status, size: text.length, preview: text.substring(0, 400) });
-    } catch(e) { results.apiTests.push({ url, error: e.message.substring(0, 60) }); }
+      const r = await fetch(url, { headers: HEADERS });
+      const text = await r.text();
+      results.wort_tests.push({
+        url, status: r.status, size: text.length,
+        hasNextData: text.includes('__NEXT_DATA__'),
+        hasInitial: text.includes('__INITIAL_STATE__'),
+        hasNuxt: text.includes('__NUXT__'),
+        preview: text.substring(0, 200),
+      });
+    } catch(e) { results.wort_tests.push({ url, error: e.message.substring(0, 80) }); }
   }
+
+  // 3. Test property.lu
+  try {
+    const r = await fetch('https://www.property.lu/fr/vente/', { headers: HEADERS });
+    const text = await r.text();
+    results.property_lu = {
+      status: r.status, size: text.length,
+      hasNextData: text.includes('__NEXT_DATA__'),
+      hasInitial: text.includes('__INITIAL_STATE__'),
+      preview: text.substring(0, 200),
+    };
+  } catch(e) { results.property_lu = { error: e.message }; }
 
   return {
     statusCode: 200,
