@@ -11,12 +11,10 @@ exports.handler = async () => {
   const r = await fetch(url, { headers: HEADERS });
   const data = await r.json();
 
-  // Return the first 2 results fully so we can understand the structure
-  const sample = (data.results || []).slice(0, 2);
-
+  const first = (data.results || [])[0] || {};
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ totalItems: data.totalItems, currentPage: data.currentPage, sample }, null, 2),
+    body: JSON.stringify({ totalItems: data.totalItems, first }, null, 2),
   };
 };
