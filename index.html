@@ -278,6 +278,49 @@
   .alert-item-desc { color: var(--text-muted); }
   .alert-delete { background: none; border: none; color: var(--text-light); cursor: pointer; font-size: 14px; padding: 2px 4px; }
   .alert-delete:hover { color: #dc2626; }
+
+  /* ── Mobile ── */
+  @media (max-width: 600px) {
+    .source-pill { padding: 8px 14px; font-size: 13px; min-height: 36px; }
+    .filters select, .filters input { min-height: 44px; padding-top: 10px; padding-bottom: 10px; font-size: 14px; }
+    .search-btn { min-height: 48px; font-size: 15px; }
+  }
+
+  @media (max-width: 480px) {
+    header { padding: 0 1rem; }
+    main { padding: 1rem; }
+    .search-panel { padding: 1rem; }
+
+    .btn-label { display: none; }
+    .alert-btn { padding: 9px 11px; }
+
+    .listing-card { grid-template-columns: 68px 1fr; padding: 10px 12px; }
+    .listing-thumb { width: 68px; height: 56px; }
+    .listing-right {
+      grid-column: 1 / -1;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-start;
+      text-align: left;
+      min-width: unset;
+      gap: 6px;
+      border-top: 0.5px solid var(--border);
+      padding-top: 8px;
+    }
+    .listing-price { font-size: 16px; }
+
+    .modal-overlay { align-items: flex-end; padding: 0; }
+    .modal {
+      border-radius: var(--radius) var(--radius) 0 0;
+      max-height: 88vh;
+      overflow-y: auto;
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    }
+
+    .sort-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sort-row select { width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -291,7 +334,7 @@
     </div>
     <button class="alert-btn" onclick="openAlertModal()">
       <i class="ti ti-bell" aria-hidden="true"></i>
-      Créer une alerte
+      <span class="btn-label">Créer une alerte</span>
     </button>
   </div>
 </header>
