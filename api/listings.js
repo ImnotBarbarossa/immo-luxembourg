@@ -87,10 +87,19 @@ async function fetchImmoweb({ type, region, budget }) {
     // Client-side locality filter: immoweb API doesn't support commune filtering
     if (region) {
       const regionNorm = region.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-      results = results.filter((item) => {
+      const filtered = results.filter((item) => {
         const loc = (item.property?.location?.locality || '').toLowerCase()
           .normalize('NFD').replace(/[̀-ͯ]/g, '');
         return loc.includes(regionNorm) || regionNorm.includes(loc);
+      });
+      // Only apply filter if it returns results; otherwise keep all (user searched a district/canton)
+      if (filtered.length > 0) results = filtered;
+    }
+
+    if (budget) {
+      results = results.filter((item) => {
+        const price = item.price?.mainValue || item.transaction?.sale?.price || 0;
+        return !price || price <= budget;
       });
     }
 
@@ -101,7 +110,6 @@ async function fetchImmoweb({ type, region, budget }) {
       const daysAgo = pubDate
         ? Math.max(0, Math.round((Date.now() - new Date(pubDate)) / 86400000))
         : 99;
-      if (budget && price && price > budget) return null;
 
       const city = prop.location?.locality || 'Luxembourg';
       const typeLabel = prop.type === 'APARTMENT' ? 'Appartement' : prop.type === 'LAND' ? 'Terrain' : 'Maison';
@@ -121,7 +129,7 @@ async function fetchImmoweb({ type, region, budget }) {
         url: `${IMMOWEB_BASE}/fr/annonce/${item.id}`,
         image: item.media?.pictures?.[0]?.mediumUrl || item.media?.pictures?.[0]?.smallUrl || null,
       };
-    }).filter(Boolean);
+    });
   } catch (e) {
     clear();
     throw e;

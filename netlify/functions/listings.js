@@ -7,6 +7,12 @@ const HEADERS = {
   'Accept-Language': 'fr-FR,fr;q=0.9',
 };
 
+function timeout(ms) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  return { signal: ctrl.signal, clear: () => clearTimeout(id) };
+}
+
 const ATHOME_TYPE_MAP = { Maison: '2', Villa: '2', Appartement: '1', Terrain: '4' };
 const ATHOME_TYPE_LABEL = { h: 'Maison', a: 'Appartement', r: 'Projet neuf', l: 'Terrain', v: 'Villa' };
 
@@ -18,8 +24,13 @@ async function fetchAthome({ type, region, budget }) {
   if (typeId) params.set('idtype[]', typeId);
 
   const url = `${ATHOME_BASE}/srp/?${params}`;
-  const resp = await fetch(url, { headers: HEADERS });
-  const html = await resp.text();
+  const { signal: sig1, clear: clear1 } = timeout(7000);
+  let html;
+  try {
+    const resp = await fetch(url, { signal: sig1, headers: HEADERS });
+    html = await resp.text();
+    clear1();
+  } catch (e) { clear1(); throw e; }
 
   const stateStart = html.indexOf('window.__INITIAL_STATE__=');
   if (stateStart === -1) throw new Error('athome: no __INITIAL_STATE__');
@@ -55,22 +66,48 @@ async function fetchAthome({ type, region, budget }) {
 }
 
 // ── immoweb.be (Luxembourg) via JSON search-results API ──────────────────────
-async function fetchImmoweb({ type, budget }) {
+async function fetchImmoweb({ type, region, budget }) {
   const propType = type === 'Appartement' ? 'APARTMENT' : type === 'Terrain' ? 'LAND' : 'HOUSE';
-  const apiUrl = `${IMMOWEB_BASE}/fr/search-results?countries=LU&transactionTypes=FOR_SALE&propertyTypes=${propType}&orderBy=newest&size=20&page=1`;
+  // Fetch more results so client-side locality filter has enough candidates
+  const apiUrl = `${IMMOWEB_BASE}/fr/search-results?countries=LU&transactionTypes=FOR_SALE&propertyTypes=${propType}&orderBy=newest&size=30&page=1`;
 
-  const resp = await fetch(apiUrl, {
-    headers: {
-      'User-Agent': HEADERS['User-Agent'],
-      'Accept': 'application/json, text/javascript, */*; q=0.01',
-      'Accept-Language': 'fr-FR,fr;q=0.9',
-      'Referer': `${IMMOWEB_BASE}/fr/recherche/maison/a-vendre/luxembourg`,
-      'X-Requested-With': 'XMLHttpRequest',
-    },
-  });
+  const { signal, clear } = timeout(7000);
+  let data;
+  try {
+    const resp = await fetch(apiUrl, {
+      signal,
+      headers: {
+        'User-Agent': HEADERS['User-Agent'],
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Accept-Language': 'fr-FR,fr;q=0.9',
+        'Referer': `${IMMOWEB_BASE}/fr/recherche/maison/a-vendre/luxembourg`,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+    data = await resp.json();
+    clear();
+  } catch (e) { clear(); throw e; }
 
-  const data = await resp.json();
-  const results = data.results || [];
+  let results = data.results || [];
+
+  // Client-side locality filter: immoweb API doesn't support commune filtering
+  if (region) {
+    const regionNorm = region.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const filtered = results.filter((item) => {
+      const loc = (item.property?.location?.locality || '').toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '');
+      return loc.includes(regionNorm) || regionNorm.includes(loc);
+    });
+    // Only apply filter if it returns results; otherwise keep all (user searched a district/canton)
+    if (filtered.length > 0) results = filtered;
+  }
+
+  if (budget) {
+    results = results.filter((item) => {
+      const price = item.price?.mainValue || item.transaction?.sale?.price || 0;
+      return !price || price <= budget;
+    });
+  }
 
   return results.slice(0, 12).map((item) => {
     const prop = item.property || {};
@@ -79,8 +116,6 @@ async function fetchImmoweb({ type, budget }) {
     const daysAgo = pubDate
       ? Math.max(0, Math.round((Date.now() - new Date(pubDate)) / 86400000))
       : 99;
-    if (budget && price && price > budget) return null;
-
     const city = prop.location?.locality || 'Luxembourg';
     const surface = prop.netHabitableSurface || prop.landSurface || 0;
     const typeLabel = prop.type === 'APARTMENT' ? 'Appartement' : prop.type === 'LAND' ? 'Terrain' : 'Maison';
@@ -94,7 +129,7 @@ async function fetchImmoweb({ type, budget }) {
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
       .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const listingUrl = item.id
-      ? `${IMMOWEB_BASE}/fr/annonce/${typeSlugFr}/${slug}/${zip}/${item.id}`
+      ? `${IMMOWEB_BASE}/fr/annonce/${typeSlugFr}/${slug}${zip ? `/${zip}` : ''}/${item.id}`
       : apiUrl;
 
     return {
@@ -112,7 +147,7 @@ async function fetchImmoweb({ type, budget }) {
       url: listingUrl,
       image: imgUrl,
     };
-  }).filter(Boolean);
+  });
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
@@ -123,7 +158,7 @@ exports.handler = async (event) => {
 
   const [athome, immoweb] = await Promise.allSettled([
     fetchAthome({ type, region, budget }),
-    fetchImmoweb({ type, budget }),
+    fetchImmoweb({ type, region, budget }),
   ]);
 
   const athomeList = athome.status === 'fulfilled' ? athome.value : [];
