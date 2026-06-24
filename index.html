@@ -185,6 +185,7 @@
     font-size: 11px; padding: 2px 7px; border-radius: 10px;
     border: 0.5px solid var(--border); color: var(--text-muted);
   }
+  .listing-badges { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
   .new-badge { font-size: 10px; padding: 2px 6px; border-radius: 6px; background: var(--green-light); color: var(--green-dark); font-weight: 600; }
   .date-label { font-size: 11px; color: var(--text-light); }
 
@@ -279,6 +280,11 @@
   .alert-delete { background: none; border: none; color: var(--text-light); cursor: pointer; font-size: 14px; padding: 2px 4px; }
   .alert-delete:hover { color: #dc2626; }
 
+  .source-pill--soon { opacity: 0.45; cursor: default; pointer-events: none; }
+
+  .prog-step.unavailable .prog-dot { background: var(--border-strong); }
+  .prog-step.unavailable { color: var(--text-light); }
+
   /* ── Mobile ── */
   @media (max-width: 600px) {
     .source-pill { padding: 8px 14px; font-size: 13px; min-height: 36px; }
@@ -309,6 +315,7 @@
       padding-top: 8px;
     }
     .listing-price { font-size: 16px; }
+    .listing-badges { justify-content: flex-start; }
 
     .modal-overlay { align-items: flex-end; padding: 0; }
     .modal {
@@ -353,10 +360,10 @@
   <div class="search-panel">
     <div class="sources-bar" id="sourcesBar">
       <div class="source-pill active" data-source="athome" onclick="toggleSource(this)"><span class="dot"></span> Athome.lu</div>
-      <div class="source-pill active" data-source="immotop" onclick="toggleSource(this)"><span class="dot"></span> Immotop.lu</div>
-      <div class="source-pill active" data-source="remax" onclick="toggleSource(this)"><span class="dot"></span> RE/MAX</div>
-      <div class="source-pill active" data-source="logicimmo" onclick="toggleSource(this)"><span class="dot"></span> Logic-immo.lu</div>
-      <div class="source-pill active" data-source="era" onclick="toggleSource(this)"><span class="dot"></span> ERA Luxembourg</div>
+      <div class="source-pill active" data-source="immoweb" onclick="toggleSource(this)"><span class="dot"></span> Immoweb.be</div>
+      <div class="source-pill source-pill--soon" title="Bientôt disponible"><span class="dot"></span> Immotop.lu</div>
+      <div class="source-pill source-pill--soon" title="Bientôt disponible"><span class="dot"></span> RE/MAX</div>
+      <div class="source-pill source-pill--soon" title="Bientôt disponible"><span class="dot"></span> ERA Luxembourg</div>
     </div>
     <div class="filters">
       <select id="typeFilter">
@@ -614,18 +621,29 @@ async function doSearch() {
     if (data.error) throw new Error(data.error);
     allListings = data.listings || [];
 
-    // Mark progress steps as done
+    // Mark progress steps as done / unavailable
     if (data.sources) {
+      const apiKeys = Object.keys(data.sources).filter(s => s !== 'errors');
       for (const [s, count] of Object.entries(data.sources)) {
         if (s === 'errors') continue;
         const el = document.getElementById('prog-'+s);
         if (el) {
           el.classList.remove('active');
-          el.classList.add(count > 0 ? 'done' : 'failed');
+          el.classList.add(count > 0 ? 'done' : 'unavailable');
           const span = el.querySelector('span');
           if (span) span.textContent = count > 0 ? `${sourceLabels[s]||s} : ${count} annonces` : `${sourceLabels[s]||s} : indisponible`;
         }
       }
+      // Remaining steps (sources not in API response) → mark unavailable
+      document.querySelectorAll('.prog-step').forEach(el => {
+        const src = el.id.replace('prog-', '');
+        if (!apiKeys.includes(src)) {
+          el.classList.remove('active');
+          el.classList.add('unavailable');
+          const span = el.querySelector('span');
+          if (span) span.textContent = `${sourceLabels[src]||src} : bientôt disponible`;
+        }
+      });
     }
     await new Promise(r => setTimeout(r, 600));
 
@@ -648,13 +666,13 @@ async function doSearch() {
 }
 
 function updateStats() {
-  const prices = [...allListings].map(l => l.price).sort((a,b) => a-b);
-  const median = prices[Math.floor(prices.length/2)];
-  const withSurface = allListings.filter(l => l.surface > 0);
+  const validPrices = allListings.filter(l => l.price > 0).map(l => l.price).sort((a,b) => a-b);
+  const median = validPrices.length ? validPrices[Math.floor(validPrices.length / 2)] : 0;
+  const withSurface = allListings.filter(l => l.surface > 0 && l.price > 0);
   const avgPpm = withSurface.length ? Math.round(withSurface.reduce((s,l) => s + l.price/l.surface, 0) / withSurface.length) : 0;
   document.getElementById('statCount').textContent = allListings.length;
-  document.getElementById('statMedian').textContent = formatPrice(median);
-  document.getElementById('statPpm').textContent = formatPrice(avgPpm) + '/m²';
+  document.getElementById('statMedian').textContent = median ? formatPrice(median) : '—';
+  document.getElementById('statPpm').textContent = avgPpm ? formatPrice(avgPpm) + '/m²' : '—';
   document.getElementById('statSources').textContent = new Set(allListings.map(l => l.source)).size;
 }
 
@@ -672,10 +690,13 @@ function renderListings() {
 
   document.getElementById('resultCount').textContent = `${total} annonce${total>1?'s':''} trouvée${total>1?'s':''}`;
 
-  document.getElementById('listingsContainer').innerHTML = page.map(l => `
-    <a class="listing-card" href="${l.url || 'https://www.athome.lu/srp/?tr=buy&q=Luxembourg'}" target="_blank" rel="noopener">
+  document.getElementById('listingsContainer').innerHTML = page.map(l => {
+    const safeUrl = l.url && /^https?:\/\//i.test(l.url) ? l.url : 'https://www.athome.lu/srp/?tr=buy&q=Luxembourg';
+    const ppm = l.surface && l.price ? formatPrice(Math.round(l.price / l.surface)) : null;
+    return `
+    <a class="listing-card" href="${safeUrl}" target="_blank" rel="noopener noreferrer">
       <div class="listing-thumb" style="background:${typeBg[l.type]||'#f3f4f6'}">
-        ${l.image ? `<img src="${l.image}" alt="${l.title}" loading="lazy" onerror="this.parentElement.innerHTML='${typeEmoji[l.type]||'🏠'}'">` : (typeEmoji[l.type]||'🏠')}
+        ${l.image ? `<img src="${l.image}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='${typeEmoji[l.type]||'🏠'}'">` : (typeEmoji[l.type]||'🏠')}
       </div>
       <div>
         <div class="listing-title">${l.title}</div>
@@ -687,16 +708,16 @@ function renderListings() {
         </div>
       </div>
       <div class="listing-right">
-        <div class="listing-price">${formatPrice(l.price)}</div>
-        ${l.surface ? `<div class="listing-ppm">${formatPrice(Math.round(l.price/l.surface))}/m²</div>` : ''}
-        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+        <div class="listing-price">${l.price ? formatPrice(l.price) : 'Prix sur demande'}</div>
+        ${ppm ? `<div class="listing-ppm">${ppm}/m²</div>` : ''}
+        <div class="listing-badges">
           ${l.isNew ? '<span class="new-badge">Nouveau</span>' : ''}
           <span class="source-badge">${sourceLabels[l.source]||l.source}</span>
         </div>
         <div class="date-label">${l.daysAgo===0?"Aujourd'hui":l.daysAgo===1?'Hier':`Il y a ${l.daysAgo}j`}</div>
       </div>
-    </a>
-  `).join('');
+    </a>`;
+  }).join('');
 
   const pagEl = document.getElementById('paginationContainer');
   if (totalPages > 1) {
@@ -727,10 +748,10 @@ function saveAlert() {
   const budget = document.getElementById('alertBudget').value;
   const freq = document.getElementById('alertFreq').value;
 
-  if (!email) { alert('Veuillez entrer une adresse email.'); return; }
+  if (!email) { window.alert('Veuillez entrer une adresse email.'); return; }
 
-  const alert = { id: Date.now(), email, type, region, budget, freq, createdAt: new Date().toISOString() };
-  savedAlerts.push(alert);
+  const newAlert = { id: Date.now(), email, type, region, budget, freq, createdAt: new Date().toISOString() };
+  savedAlerts.push(newAlert);
   localStorage.setItem('immo_alerts', JSON.stringify(savedAlerts));
 
   hide('alertModal');
