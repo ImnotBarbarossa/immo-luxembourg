@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Immo Luxembourg — Recherche agrégée</title>
+<title>Immo Frontière — Arlon · Attert · Province de Luxembourg</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/tabler-icons.min.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -280,7 +280,17 @@
   .alert-delete { background: none; border: none; color: var(--text-light); cursor: pointer; font-size: 14px; padding: 2px 4px; }
   .alert-delete:hover { color: #dc2626; }
 
-  .source-pill--soon { opacity: 0.45; cursor: default; pointer-events: none; }
+  .source-pill--link { text-decoration: none; }
+  .source-pill--link:hover { border-color: var(--green); color: var(--green-dark); }
+
+  .check-field {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 10px; border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border-strong);
+    background: var(--bg); color: var(--text);
+    font-size: 13px; cursor: pointer; user-select: none;
+  }
+  .check-field input { accent-color: var(--green); width: 16px; height: 16px; cursor: pointer; }
 
   .prog-step.unavailable .prog-dot { background: var(--border-strong); }
   .prog-step.unavailable { color: var(--text-light); }
@@ -336,8 +346,8 @@
   <div class="header-inner">
     <div class="logo">
       <i class="ti ti-building-estate logo-icon" aria-hidden="true"></i>
-      Immo Luxembourg
-      <span class="logo-badge">Agrégateur</span>
+      Immo Frontière
+      <span class="logo-badge">Arlon · Attert</span>
     </div>
     <button class="alert-btn" onclick="openAlertModal()">
       <i class="ti ti-bell" aria-hidden="true"></i>
@@ -361,38 +371,38 @@
     <div class="sources-bar" id="sourcesBar">
       <div class="source-pill active" data-source="athome" onclick="toggleSource(this)"><span class="dot"></span> Athome.lu</div>
       <div class="source-pill active" data-source="immoweb" onclick="toggleSource(this)"><span class="dot"></span> Immoweb.be</div>
-      <div class="source-pill source-pill--soon" title="Bientôt disponible"><span class="dot"></span> Immotop.lu</div>
-      <div class="source-pill source-pill--soon" title="Bientôt disponible"><span class="dot"></span> RE/MAX</div>
-      <div class="source-pill source-pill--soon" title="Bientôt disponible"><span class="dot"></span> ERA Luxembourg</div>
+      <a class="source-pill source-pill--link" href="https://www.honesty.be" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link" aria-hidden="true"></i> Honesty</a>
+      <a class="source-pill source-pill--link" href="https://www.wimmobiliere.be" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link" aria-hidden="true"></i> W Immobilière</a>
     </div>
     <div class="filters">
       <select id="typeFilter">
+        <option value="maison" selected>Maison</option>
         <option value="">Tous les types</option>
-        <option value="maison">Maison</option>
         <option value="appartement">Appartement</option>
         <option value="villa">Villa</option>
         <option value="terrain">Terrain</option>
       </select>
       <select id="regionFilter">
-        <option value="">Toute région</option>
-        <option value="luxembourg">Ville de Luxembourg</option>
-        <option value="esch">Esch-sur-Alzette</option>
-        <option value="differdange">Differdange</option>
-        <option value="dudelange">Dudelange</option>
-        <option value="strassen">Strassen</option>
-        <option value="bertrange">Bertrange</option>
-        <option value="hesperange">Hesperange</option>
-        <option value="nord">Luxembourg Nord</option>
-        <option value="est">Luxembourg Est</option>
+        <option value="">Arrondissement d'Arlon</option>
+        <option value="attert">Attert</option>
+        <option value="arlon">Arlon</option>
+        <option value="messancy">Messancy</option>
+        <option value="aubange">Aubange</option>
+        <option value="martelange">Martelange</option>
       </select>
       <select id="budgetFilter">
         <option value="">Budget max</option>
+        <option value="300000">300 000 €</option>
+        <option value="400000">400 000 €</option>
         <option value="500000">500 000 €</option>
-        <option value="750000">750 000 €</option>
+        <option value="650000">650 000 €</option>
+        <option value="800000">800 000 €</option>
         <option value="1000000">1 000 000 €</option>
-        <option value="1500000">1 500 000 €</option>
-        <option value="2000000">2 000 000 €</option>
       </select>
+      <label class="check-field" for="facadesFilter">
+        <input type="checkbox" id="facadesFilter" checked>
+        4 façades uniquement
+      </label>
       <button class="search-btn" onclick="doSearch()" id="searchBtn">
         <i class="ti ti-search" aria-hidden="true"></i> Rechercher
       </button>
@@ -435,13 +445,13 @@
 
   <div id="initialState" class="state-box">
     <i class="ti ti-map-search state-icon" aria-hidden="true"></i>
-    <div class="state-title">Trouvez votre bien idéal au Luxembourg</div>
-    <div class="state-sub">Sélectionnez vos critères et lancez la recherche</div>
+    <div class="state-title">Votre maison 4 façades près de la frontière luxembourgeoise</div>
+    <div class="state-sub">Attert, Arlon et les communes de l'arrondissement — lancez la recherche</div>
   </div>
 
   <div class="disclaimer" id="disclaimerEl" style="display:none">
     <i class="ti ti-info-circle" aria-hidden="true"></i>
-    Les annonces sont générées par l'IA à des fins de démonstration et ne représentent pas de vraies annonces. Pour consulter les vraies annonces, visitez directement les sites athome.lu, immotop.lu, remax.lu, logic-immo.lu ou era.lu.
+    Annonces agrégées depuis immoweb.be et athome.lu pour l'arrondissement d'Arlon (Attert, Arlon, Messancy, Aubange, Martelange). Les agences locales Honesty et W Immobilière publient généralement aussi leurs biens sur Immoweb ; utilisez les liens en haut de page pour consulter leurs sites directement.
   </div>
 </main>
 
@@ -468,27 +478,24 @@
     <div class="modal-field">
       <label>Région</label>
       <select id="alertRegion">
-        <option value="">Toute région</option>
-        <option value="luxembourg">Ville de Luxembourg</option>
-        <option value="esch">Esch-sur-Alzette</option>
-        <option value="differdange">Differdange</option>
-        <option value="dudelange">Dudelange</option>
-        <option value="strassen">Strassen</option>
-        <option value="bertrange">Bertrange</option>
-        <option value="hesperange">Hesperange</option>
-        <option value="nord">Luxembourg Nord</option>
-        <option value="est">Luxembourg Est</option>
+        <option value="">Arrondissement d'Arlon</option>
+        <option value="attert">Attert</option>
+        <option value="arlon">Arlon</option>
+        <option value="messancy">Messancy</option>
+        <option value="aubange">Aubange</option>
+        <option value="martelange">Martelange</option>
       </select>
     </div>
     <div class="modal-field">
       <label>Budget maximum</label>
       <select id="alertBudget">
         <option value="">Pas de limite</option>
+        <option value="300000">300 000 €</option>
+        <option value="400000">400 000 €</option>
         <option value="500000">500 000 €</option>
-        <option value="750000">750 000 €</option>
+        <option value="650000">650 000 €</option>
+        <option value="800000">800 000 €</option>
         <option value="1000000">1 000 000 €</option>
-        <option value="1500000">1 500 000 €</option>
-        <option value="2000000">2 000 000 €</option>
       </select>
     </div>
     <div class="modal-field">
@@ -514,59 +521,9 @@ const PER_PAGE = 8;
 let activeSources = new Set(['athome','immoweb']);
 let savedAlerts = JSON.parse(localStorage.getItem('immo_alerts') || '[]');
 
-const sourceLabels = { athome:'Athome.lu', immoweb:'Immoweb.be', wort:'Wort.lu', immotop:'Immotop.lu', remax:'RE/MAX', logicimmo:'Logic-immo.lu', era:'ERA Luxembourg' };
+const sourceLabels = { athome:'Athome.lu', immoweb:'Immoweb.be' };
 const typeBg = { Maison:'#E1F5EE', Appartement:'#E6F1FB', Villa:'#FAECE7', Terrain:'#EAF3DE' };
 const typeEmoji = { Maison:'🏡', Appartement:'🏢', Villa:'🏛️', Terrain:'🌿' };
-
-function buildSearchUrl(source, type, location, budget) {
-  const typeMap = {
-    athome:    { Maison:'house', Appartement:'apartment', Villa:'house', Terrain:'land' },
-    immotop:   { Maison:'maison', Appartement:'appartement', Villa:'maison', Terrain:'terrain' },
-    logicimmo: { Maison:'maison', Appartement:'appartement', Villa:'maison', Terrain:'terrain' },
-  };
-  const city = location ? location.split(',')[0].trim().toLowerCase().replace(/\s+/g, '-') : '';
-  const price = budget ? parseInt(budget) : '';
-
-  switch(source) {
-    case 'athome': {
-      const t = typeMap.athome[type] || 'property';
-      let url = `https://www.athome.lu/en/srp/?tr=buy&q=${encodeURIComponent(location || 'Luxembourg')}`;
-      if (type) url += `&type=${t}`;
-      if (price) url += `&maxPrice=${price}`;
-      return url;
-    }
-    case 'immotop': {
-      const t = typeMap.immotop[type] || '';
-      let url = `https://www.immotop.lu/vente/${t ? t+'/' : ''}`;
-      if (city) url += `${city}/`;
-      if (price) url += `?prix_max=${price}`;
-      return url;
-    }
-    case 'remax': {
-      let url = `https://www.remax.lu/buy/`;
-      if (city) url += `?location=${encodeURIComponent(location || '')}`;
-      if (price) url += `${city ? '&' : '?'}maxPrice=${price}`;
-      return url;
-    }
-    case 'logicimmo': {
-      const t = typeMap.logicimmo[type] || '';
-      let url = `https://www.logic-immo.lu/vente-immobilier-${city || 'luxembourg'}`;
-      if (t) url += `,${t}`;
-      url += '.htm';
-      if (price) url += `?maxPrice=${price}`;
-      return url;
-    }
-    case 'era': {
-      let url = `https://www.era.lu/recherche?transaction=vente`;
-      if (type) url += `&type=${encodeURIComponent(type)}`;
-      if (location) url += `&localite=${encodeURIComponent(location.split(',')[0])}`;
-      if (price) url += `&prixMax=${price}`;
-      return url;
-    }
-    default:
-      return `https://www.athome.lu/`;
-  }
-}
 
 function toggleSource(el) {
   const src = el.dataset.source;
@@ -589,6 +546,7 @@ async function doSearch() {
   const type = document.getElementById('typeFilter').value;
   const region = document.getElementById('regionFilter').value;
   const budget = document.getElementById('budgetFilter').value;
+  const fourFacades = document.getElementById('facadesFilter').checked;
 
   hide('initialState'); hide('emptyState'); hide('errorState');
   hide('statsRow'); hide('sortRow'); hide('disclaimerEl'); hide('paginationContainer');
@@ -615,7 +573,7 @@ async function doSearch() {
     const resp = await fetch('/api/listings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, region, budget })
+      body: JSON.stringify({ type, region, budget, fourFacades })
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
@@ -691,7 +649,7 @@ function renderListings() {
   document.getElementById('resultCount').textContent = `${total} annonce${total>1?'s':''} trouvée${total>1?'s':''}`;
 
   document.getElementById('listingsContainer').innerHTML = page.map(l => {
-    const safeUrl = l.url && /^https?:\/\//i.test(l.url) ? l.url : 'https://www.athome.lu/srp/?tr=buy&q=Luxembourg';
+    const safeUrl = l.url && /^https?:\/\//i.test(l.url) ? l.url : 'https://www.immoweb.be/fr/recherche/maison/a-vendre/arlon/6700';
     const ppm = l.surface && l.price ? formatPrice(Math.round(l.price / l.surface)) : null;
     return `
     <a class="listing-card" href="${safeUrl}" target="_blank" rel="noopener noreferrer">
