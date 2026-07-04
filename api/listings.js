@@ -28,6 +28,9 @@ function timeout(ms) {
   return { signal: ctrl.signal, clear: () => clearTimeout(id) };
 }
 
+// Mentions qui excluent un bien "4 façades" (maison mitoyenne, 2-3 façades…)
+const NOT_DETACHED_RE = /(2|3|deux|trois)\s*fa[çc]ades|mitoyen|jumel[ée]|semi-?detached|maison de (ville|rang[ée]e)|row\s*house|town\s*house/i;
+
 async function fetchAthome({ type, region, budget, fourFacades }) {
   // athome.lu référence aussi les biens belges frontaliers (ciblés frontaliers)
   const q = region ? region.charAt(0).toUpperCase() + region.slice(1) : 'Arlon';
@@ -52,12 +55,12 @@ async function fetchAthome({ type, region, budget, fourFacades }) {
     const state = JSON.parse(stateJson.replace(/:undefined(?=[,}\]])/g, ':null'));
     let list = state?.search?.list || [];
 
+    // Exclut tout bien explicitement non-4-façades ; le bénéfice du doute est
+    // gardé pour les annonces qui ne précisent rien (athome n'expose pas le
+    // nombre de façades dans sa liste de résultats)
     if (fourFacades) {
-      const detached = list.filter((item) =>
-        /4\s*fa[çc]ades|villa/i.test(`${item.title || ''} ${item.propertySubType || ''}`)
-        || item.propertyType === 'v');
-      // Si la donnée ne permet pas de trancher, on garde tout plutôt que de tout masquer
-      if (detached.length > 0) list = detached;
+      list = list.filter((item) =>
+        !NOT_DETACHED_RE.test(`${item.title || ''} ${item.propertySubType || ''}`));
     }
 
     return list.slice(0, 12).map((item) => {
@@ -89,12 +92,17 @@ async function fetchAthome({ type, region, budget, fourFacades }) {
   }
 }
 
+// Sous-types Immoweb structurellement incompatibles avec une maison 4 façades
+const ATTACHED_SUBTYPES = new Set(['TOWN_HOUSE', 'APARTMENT_BLOCK', 'MIXED_USE_BUILDING']);
+
 async function fetchImmoweb({ type, region, budget, fourFacades }) {
   const t = normType(type);
   const propType = t === 'Appartement' ? 'APARTMENT' : t === 'Terrain' ? 'LAND' : 'HOUSE';
   // districts=ARLON limite à l'arrondissement d'Arlon ; size=30 pour laisser
   // de la marge aux filtres client (commune, 4 façades, budget)
-  const apiUrl = `${IMMOWEB_BASE}/fr/search-results?countries=BE&districts=ARLON&transactionTypes=FOR_SALE&propertyTypes=${propType}&orderBy=newest&size=30&page=1`;
+  let apiUrl = `${IMMOWEB_BASE}/fr/search-results?countries=BE&districts=ARLON&transactionTypes=FOR_SALE&propertyTypes=${propType}&orderBy=newest&size=30&page=1`;
+  // Filtre à la source : même critère que "Façades : 4 ou plus" sur immoweb.be
+  if (fourFacades) apiUrl += '&minFacadeCount=4';
 
   const { signal, clear } = timeout(7000);
   try {
@@ -129,14 +137,17 @@ async function fetchImmoweb({ type, region, budget, fourFacades }) {
       if (filtered.length > 0) results = filtered;
     }
 
+    // Ceinture et bretelles derrière minFacadeCount : on exclut tout bien dont
+    // les données contredisent "4 façades" (nombre de façades < 4 ou sous-type
+    // mitoyen) ; les annonces sans donnée gardent le bénéfice du doute
     if (fourFacades) {
-      const detached = results.filter((item) => {
-        const subtype = (item.property?.subtype || '').toUpperCase();
+      results = results.filter((item) => {
         const facades = item.property?.building?.facadeCount;
-        return subtype === 'VILLA' || (facades && facades >= 4);
+        if (facades != null && Number(facades) > 0) return Number(facades) >= 4;
+        const subtype = (item.property?.subtype || '').toUpperCase();
+        if (ATTACHED_SUBTYPES.has(subtype)) return false;
+        return !NOT_DETACHED_RE.test(item.property?.title || '');
       });
-      // Si la donnée ne permet pas de trancher, on garde tout plutôt que de tout masquer
-      if (detached.length > 0) results = detached;
     }
 
     if (budget) {
@@ -155,7 +166,11 @@ async function fetchImmoweb({ type, region, budget, fourFacades }) {
         : 99;
 
       const city = prop.location?.locality || 'Arlon';
-      const typeLabel = prop.type === 'APARTMENT' ? 'Appartement' : prop.type === 'LAND' ? 'Terrain' : 'Maison';
+      const subtype = (prop.subtype || '').toUpperCase();
+      const typeLabel = prop.type === 'APARTMENT' ? 'Appartement'
+        : prop.type === 'LAND' ? 'Terrain'
+        : subtype === 'VILLA' ? 'Villa'
+        : 'Maison';
 
       return {
         id: `iw-${item.id}`,
@@ -180,11 +195,18 @@ async function fetchImmoweb({ type, region, budget, fourFacades }) {
 }
 
 module.exports = async function handler(req, res) {
-  if (req.method !== 'POST') {
+  // GET (paramètres d'URL) accepté en plus de POST pour tester depuis un navigateur
+  let params;
+  if (req.method === 'POST') {
+    params = req.body || {};
+  } else if (req.method === 'GET') {
+    const q = req.query || {};
+    params = { ...q, fourFacades: q.fourFacades === '1' || q.fourFacades === 'true' };
+  } else {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { type, region, budget, fourFacades } = req.body || {};
+  const { type, region, budget, fourFacades } = params;
   const budgetNum = budget ? parseInt(budget, 10) : 0;
 
   const [athome, immoweb] = await Promise.allSettled([
