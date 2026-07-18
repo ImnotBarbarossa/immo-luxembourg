@@ -369,38 +369,31 @@
 
   <div class="search-panel">
     <div class="sources-bar" id="sourcesBar">
-      <div class="source-pill active" data-source="athome" onclick="toggleSource(this)"><span class="dot"></span> Athome.lu</div>
       <div class="source-pill active" data-source="immoweb" onclick="toggleSource(this)"><span class="dot"></span> Immoweb.be</div>
-      <a class="source-pill source-pill--link" href="https://www.honesty.be" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link" aria-hidden="true"></i> Honesty</a>
-      <a class="source-pill source-pill--link" href="https://www.wimmobiliere.com" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link" aria-hidden="true"></i> W Immobilière</a>
-      <a class="source-pill source-pill--link" href="https://www.immotop.lu/en/vente-maisons/luxembourg-wallonia-province/arlon/" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link" aria-hidden="true"></i> Immotop.lu</a>
-      <a class="source-pill source-pill--link" href="https://www.immo23.be" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link" aria-hidden="true"></i> Immo23</a>
-      <a class="source-pill source-pill--link" href="https://immo.notaire.be/fr/biens-a-vendre-dans-la-province/luxembourg" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link" aria-hidden="true"></i> Notaire.be</a>
+      <div class="source-pill active" data-source="honesty" onclick="toggleSource(this)"><span class="dot"></span> Honesty</div>
+      <div class="source-pill active" data-source="wimmo" onclick="toggleSource(this)"><span class="dot"></span> W Immobilière</div>
+      <div class="source-pill active" data-source="era" onclick="toggleSource(this)"><span class="dot"></span> ERA</div>
+    </div>
+    <div class="sources-bar">
+      <a class="source-pill source-pill--link" href="https://www.honesty.be/biens-a-vendre/?purpose=%5B1%2C3%5D&amp;orderByField=Zip&amp;orderSorting=ASC&amp;displayStatusIdList=%5B2%5D&amp;searchtxtinput=Attert+%286717%29&amp;searchinput=6717&amp;searchziplabel=Attert+%286717%29&amp;category=1&amp;rooms=0&amp;minprice=&amp;maxprice=600000&amp;inputestateid=" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link" aria-hidden="true"></i> Ma recherche Honesty</a>
+      <a class="source-pill source-pill--link" href="https://www.wimmobiliere.com/rechercher/biens?SortFields=ID+DESC&amp;Goal=0&amp;Zips%5B%5D=6717&amp;Zips%5B%5D=6700&amp;Zips%5B%5D=6706&amp;WebIDs=1&amp;PriceTo=600000" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link" aria-hidden="true"></i> Ma recherche W Immo</a>
+      <a class="source-pill source-pill--link" href="https://www.era.be/fr/a-vendre?pager%5Blimit%5D=24&amp;broker_id=6000144&amp;filter%5Blocation%5D%5Bmunicipalities%5D=187+181&amp;filter%5Blocation%5D%5Bsub_municipalities%5D=796+946+1386+1450+2536+2008+2019+2501+2543&amp;filter%5Bproperty_type%5D=46&amp;filter%5Bprice%5D=%28min%3A%3Bmax%3A600000%29" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link" aria-hidden="true"></i> Ma recherche ERA</a>
     </div>
     <div class="filters">
-      <select id="typeFilter">
-        <option value="maison" selected>Maison</option>
-        <option value="">Tous les types</option>
-        <option value="appartement">Appartement</option>
-        <option value="villa">Villa</option>
-        <option value="terrain">Terrain</option>
-      </select>
       <select id="regionFilter">
-        <option value="">Arrondissement d'Arlon</option>
+        <option value="">Arlon · Attert · Habay · Messancy</option>
         <option value="attert">Attert</option>
         <option value="arlon">Arlon</option>
+        <option value="habay">Habay</option>
         <option value="messancy">Messancy</option>
-        <option value="aubange">Aubange</option>
-        <option value="martelange">Martelange</option>
       </select>
       <select id="budgetFilter">
-        <option value="">Budget max</option>
-        <option value="300000">300 000 €</option>
         <option value="400000">400 000 €</option>
         <option value="500000">500 000 €</option>
-        <option value="650000">650 000 €</option>
+        <option value="600000" selected>600 000 €</option>
+        <option value="700000">700 000 €</option>
         <option value="800000">800 000 €</option>
-        <option value="1000000">1 000 000 €</option>
+        <option value="">Pas de limite</option>
       </select>
       <label class="check-field" for="facadesFilter">
         <input type="checkbox" id="facadesFilter" checked>
@@ -449,12 +442,12 @@
   <div id="initialState" class="state-box">
     <i class="ti ti-map-search state-icon" aria-hidden="true"></i>
     <div class="state-title">Votre maison 4 façades près de la frontière luxembourgeoise</div>
-    <div class="state-sub">Attert, Arlon et les communes de l'arrondissement — lancez la recherche</div>
+    <div class="state-sub">Arlon, Attert, Habay, Messancy — sur Immoweb, Honesty, W Immobilière et ERA</div>
   </div>
 
   <div class="disclaimer" id="disclaimerEl" style="display:none">
     <i class="ti ti-info-circle" aria-hidden="true"></i>
-    Annonces agrégées depuis immoweb.be et athome.lu pour l'arrondissement d'Arlon (Attert, Arlon, Messancy, Aubange, Martelange). Les agences locales (Honesty, W Immobilière, Immo23…) publient généralement aussi leurs biens sur Immoweb ; les liens en haut de page ouvrent leurs sites, ainsi qu'Immotop.lu (biens belges frontaliers) et les ventes notariales (Notaire.be / Biddit). Le filtre "4 façades" écarte tout bien signalé mitoyen ou à moins de 4 façades ; les annonces qui ne précisent pas leur nombre de façades restent affichées.
+    Annonces agrégées depuis Immoweb, Honesty, W Immobilière et ERA pour Arlon, Attert, Habay et Messancy — chaque carte ouvre l'annonce d'origine. Le badge 🆕 signale les annonces apparues depuis votre dernière visite sur cet appareil ; la page revérifie automatiquement toutes les 30 minutes tant qu'elle est ouverte (activez les notifications via "Créer une alerte"). Le filtre "4 façades" écarte tout bien signalé mitoyen ou à moins de 4 façades ; les annonces qui ne précisent rien restent affichées.
   </div>
 </main>
 
@@ -481,24 +474,22 @@
     <div class="modal-field">
       <label>Région</label>
       <select id="alertRegion">
-        <option value="">Arrondissement d'Arlon</option>
+        <option value="">Arlon · Attert · Habay · Messancy</option>
         <option value="attert">Attert</option>
         <option value="arlon">Arlon</option>
+        <option value="habay">Habay</option>
         <option value="messancy">Messancy</option>
-        <option value="aubange">Aubange</option>
-        <option value="martelange">Martelange</option>
       </select>
     </div>
     <div class="modal-field">
       <label>Budget maximum</label>
       <select id="alertBudget">
-        <option value="">Pas de limite</option>
-        <option value="300000">300 000 €</option>
         <option value="400000">400 000 €</option>
         <option value="500000">500 000 €</option>
-        <option value="650000">650 000 €</option>
+        <option value="600000" selected>600 000 €</option>
+        <option value="700000">700 000 €</option>
         <option value="800000">800 000 €</option>
-        <option value="1000000">1 000 000 €</option>
+        <option value="">Pas de limite</option>
       </select>
     </div>
     <div class="modal-field">
@@ -521,10 +512,11 @@
 let allListings = [];
 let currentPage = 1;
 const PER_PAGE = 8;
-let activeSources = new Set(['athome','immoweb']);
+let activeSources = new Set(['immoweb','honesty','wimmo','era']);
 let savedAlerts = JSON.parse(localStorage.getItem('immo_alerts') || '[]');
+let seenIds = new Set(JSON.parse(localStorage.getItem('immo_seen_ids') || '[]'));
 
-const sourceLabels = { athome:'Athome.lu', immoweb:'Immoweb.be' };
+const sourceLabels = { immoweb:'Immoweb.be', honesty:'Honesty', wimmo:'W Immobilière', era:'ERA' };
 const typeBg = { Maison:'#E1F5EE', Appartement:'#E6F1FB', Villa:'#FAECE7', Terrain:'#EAF3DE' };
 const typeEmoji = { Maison:'🏡', Appartement:'🏢', Villa:'🏛️', Terrain:'🌿' };
 
@@ -545,46 +537,67 @@ function formatPrice(n) {
 function show(id) { document.getElementById(id).style.display = 'block'; }
 function hide(id) { document.getElementById(id).style.display = 'none'; }
 
-async function doSearch() {
-  const type = document.getElementById('typeFilter').value;
+function detectNewListings() {
+  // Repère les annonces jamais vues sur cet appareil (localStorage)
+  const firstVisit = seenIds.size === 0;
+  const newOnes = allListings.filter(l => !seenIds.has(l.id));
+  allListings.forEach(l => { l.isNewForYou = !firstVisit && !seenIds.has(l.id); seenIds.add(l.id); });
+  localStorage.setItem('immo_seen_ids', JSON.stringify([...seenIds].slice(-800)));
+
+  if (firstVisit || !newOnes.length) { hide('alertSuccess'); return; }
+
+  document.getElementById('alertSuccessText').innerHTML =
+    `<strong>${newOnes.length} nouvelle${newOnes.length>1?'s':''} annonce${newOnes.length>1?'s':''}</strong> depuis votre dernière visite !`;
+  show('alertSuccess');
+
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification(`🏡 ${newOnes.length} nouvelle(s) annonce(s)`, {
+        body: newOnes.slice(0, 3).map(l => `${l.title} — ${l.price ? formatPrice(l.price) : 'prix s/d'}`).join('\n'),
+      });
+    } catch(e) { /* notifications non supportées sur cette plateforme */ }
+  }
+}
+
+async function doSearch(quiet) {
   const region = document.getElementById('regionFilter').value;
   const budget = document.getElementById('budgetFilter').value;
   const fourFacades = document.getElementById('facadesFilter').checked;
 
-  hide('initialState'); hide('emptyState'); hide('errorState');
-  hide('statsRow'); hide('sortRow'); hide('disclaimerEl'); hide('paginationContainer');
-  document.getElementById('listingsContainer').innerHTML = '';
+  if (!quiet) {
+    hide('initialState'); hide('emptyState'); hide('errorState');
+    hide('statsRow'); hide('sortRow'); hide('disclaimerEl'); hide('paginationContainer');
+    document.getElementById('listingsContainer').innerHTML = '';
 
-  show('loadingState');
-  document.getElementById('searchBtn').disabled = true;
+    show('loadingState');
+    document.getElementById('searchBtn').disabled = true;
 
-  const sources = [...activeSources];
-  const steps = document.getElementById('progressSteps');
-  steps.innerHTML = sources.map(s => `<div class="prog-step" id="prog-${s}"><div class="prog-dot"></div><span>Recherche sur ${sourceLabels[s]}…</span></div>`).join('');
+    const sources = [...activeSources];
+    const steps = document.getElementById('progressSteps');
+    steps.innerHTML = sources.map(s => `<div class="prog-step" id="prog-${s}"><div class="prog-dot"></div><span>Recherche sur ${sourceLabels[s]}…</span></div>`).join('');
 
-  let delay = 0;
-  for (const s of sources) {
-    setTimeout(() => {
-      document.querySelectorAll('.prog-step').forEach(e => e.classList.remove('active'));
-      const el = document.getElementById('prog-'+s);
-      if (el) el.classList.add('active');
-    }, delay);
-    delay += 500;
+    let delay = 0;
+    for (const s of sources) {
+      setTimeout(() => {
+        document.querySelectorAll('.prog-step').forEach(e => e.classList.remove('active'));
+        const el = document.getElementById('prog-'+s);
+        if (el) el.classList.add('active');
+      }, delay);
+      delay += 400;
+    }
   }
 
   try {
     const resp = await fetch('/api/listings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, region, budget, fourFacades })
+      body: JSON.stringify({ region, budget, fourFacades })
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
-    allListings = data.listings || [];
+    allListings = (data.listings || []).filter(l => activeSources.has(l.source));
 
-    // Mark progress steps as done / unavailable
-    if (data.sources) {
-      const apiKeys = Object.keys(data.sources).filter(s => s !== 'errors');
+    if (!quiet && data.sources) {
       for (const [s, count] of Object.entries(data.sources)) {
         if (s === 'errors') continue;
         const el = document.getElementById('prog-'+s);
@@ -595,36 +608,35 @@ async function doSearch() {
           if (span) span.textContent = count > 0 ? `${sourceLabels[s]||s} : ${count} annonces` : `${sourceLabels[s]||s} : indisponible`;
         }
       }
-      // Remaining steps (sources not in API response) → mark unavailable
-      document.querySelectorAll('.prog-step').forEach(el => {
-        const src = el.id.replace('prog-', '');
-        if (!apiKeys.includes(src)) {
-          el.classList.remove('active');
-          el.classList.add('unavailable');
-          const span = el.querySelector('span');
-          if (span) span.textContent = `${sourceLabels[src]||src} : bientôt disponible`;
-        }
-      });
+      await new Promise(r => setTimeout(r, 600));
     }
-    await new Promise(r => setTimeout(r, 600));
 
     hide('loadingState');
     document.getElementById('searchBtn').disabled = false;
 
+    detectNewListings();
+
     if (!allListings.length) { show('emptyState'); return; }
 
-    currentPage = 1;
+    if (!quiet) currentPage = 1;
     updateStats();
     show('statsRow'); show('sortRow'); show('disclaimerEl');
     renderListings();
   } catch(err) {
     hide('loadingState');
     document.getElementById('searchBtn').disabled = false;
-    const errEl = document.getElementById('errorState');
-    errEl.style.display = 'block';
-    errEl.textContent = '⚠️ Erreur : ' + (err.message || 'Problème de connexion. Vérifiez votre clé API.');
+    if (!quiet) {
+      const errEl = document.getElementById('errorState');
+      errEl.style.display = 'block';
+      errEl.textContent = '⚠️ Erreur : ' + (err.message || 'Problème de connexion.');
+    }
   }
 }
+
+// Re-vérifie les annonces toutes les 30 min tant que la page est ouverte
+setInterval(() => {
+  if (allListings.length) doSearch(true);
+}, 30 * 60 * 1000);
 
 function updateStats() {
   const validPrices = allListings.filter(l => l.price > 0).map(l => l.price).sort((a,b) => a-b);
@@ -643,7 +655,7 @@ function renderListings() {
   if (sort === 'price_asc') data.sort((a,b) => a.price - b.price);
   else if (sort === 'price_desc') data.sort((a,b) => b.price - a.price);
   else if (sort === 'surface') data.sort((a,b) => b.surface - a.surface);
-  else data.sort((a,b) => a.daysAgo - b.daysAgo);
+  else data.sort((a,b) => (a.daysAgo ?? 99) - (b.daysAgo ?? 99));
 
   const total = data.length;
   const totalPages = Math.ceil(total / PER_PAGE);
@@ -672,10 +684,10 @@ function renderListings() {
         <div class="listing-price">${l.price ? formatPrice(l.price) : 'Prix sur demande'}</div>
         ${ppm ? `<div class="listing-ppm">${ppm}/m²</div>` : ''}
         <div class="listing-badges">
-          ${l.isNew ? '<span class="new-badge">Nouveau</span>' : ''}
+          ${l.isNewForYou ? '<span class="new-badge">🆕 Nouveau pour vous</span>' : (l.isNew ? '<span class="new-badge">Nouveau</span>' : '')}
           <span class="source-badge">${sourceLabels[l.source]||l.source}</span>
         </div>
-        <div class="date-label">${l.daysAgo===0?"Aujourd'hui":l.daysAgo===1?'Hier':`Il y a ${l.daysAgo}j`}</div>
+        ${l.daysAgo != null ? `<div class="date-label">${l.daysAgo===0?"Aujourd'hui":l.daysAgo===1?'Hier':`Il y a ${l.daysAgo}j`}</div>` : ''}
       </div>
     </a>`;
   }).join('');
@@ -710,6 +722,12 @@ function saveAlert() {
   const freq = document.getElementById('alertFreq').value;
 
   if (!email) { window.alert('Veuillez entrer une adresse email.'); return; }
+
+  // Active aussi les notifications navigateur (nouvelles annonces détectées
+  // pendant que la page est ouverte)
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
 
   const newAlert = { id: Date.now(), email, type, region, budget, freq, createdAt: new Date().toISOString() };
   savedAlerts.push(newAlert);
