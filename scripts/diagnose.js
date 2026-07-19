@@ -36,6 +36,7 @@ const ZONE = new Set(['6700','6704','6706','6717','6720','6721','6723','6724','6
   console.log('\n════ TEST 3 : URL de détail Honesty valide ? ════');
   const hon = r1.listings.find((l) => l.source === 'honesty');
   if (hon) {
+    console.log('bien complet:', JSON.stringify(hon));
     const r = await get(hon.url);
     console.log(hon.url, '→', r.status, '| title:', (r.body.match(/<title>([^<]*)</) || [])[1]);
   } else {

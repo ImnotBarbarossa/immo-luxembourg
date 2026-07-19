@@ -218,13 +218,29 @@ async function fetchImmoweb({ region, budget, fourFacades }) {
 }
 
 // ── Honesty (JSON Whise embarqué dans la page de recherche) ──────────────────
+// La page n'embarque qu'une page de résultats : on interroge commune par
+// commune (searchinput=code postal, comme le fait le site lui-même)
 async function fetchHonesty({ region, budget, fourFacades }) {
-  const url = `${HONESTY_BASE}/biens-a-vendre/?purpose=%5B1%2C3%5D&displayStatusIdList=%5B2%5D&category=1&maxprice=${budget || 600000}`;
-  const html = await fetchText(url);
-  const estates = extractWhiseEstates(html);
-  if (!estates.length) throw new Error('honesty: aucun bien extrait de la page');
+  const zips = region && REGION_POSTALS[region]
+    ? REGION_POSTALS[region].slice(0, 2)
+    : ['6700', '6717', '6720', '6780'];
+  const makeUrl = (zip) =>
+    `${HONESTY_BASE}/biens-a-vendre/?purpose=%5B1%2C3%5D&displayStatusIdList=%5B2%5D&category=1&searchinput=${zip}&searchtxtinput=${zip}&searchziplabel=${zip}&maxprice=${budget || 600000}`;
 
-  // La page embarque tout le réseau Honesty : on filtre nous-mêmes
+  const pages = await Promise.allSettled(zips.map((z) => fetchText(makeUrl(z))));
+  const byId = new Map();
+  let okPages = 0;
+  for (const p of pages) {
+    if (p.status !== 'fulfilled') continue;
+    okPages++;
+    for (const e of extractWhiseEstates(p.value)) {
+      const key = e.id || e.referenceNumber;
+      if (key && !byId.has(key)) byId.set(key, e);
+    }
+  }
+  if (okPages === 0) throw new Error('honesty: aucune page accessible');
+  const estates = [...byId.values()];
+
   let list = estates.filter((e) => ZONE_POSTALS.has(String(e.zip || '')));
   // Vente uniquement (purposeId 1 = vente chez Whise) et maisons si renseigné
   list = list.filter((e) => !e.purposeId || e.purposeId === 1 || e.purposeId === 3);
@@ -286,9 +302,10 @@ async function fetchWimmo({ region, budget, fourFacades }) {
   if (budget) list = list.filter((p) => { const pr = parsePrice(p.title || ''); return !pr || pr <= budget; });
 
   return list.slice(0, 12).map((p) => {
+    // linkTxt : ['https:', 'www.wimmobiliere.com', 'acheter', 'maison', commune, id, slug]
     const parts = linkTxt(p).split('/').filter(Boolean);
-    const commune = parts[3] || 'arlon';
-    const slug = (parts[5] || '').replace(/-/g, ' ');
+    const commune = parts[4] || 'arlon';
+    const slug = (parts[6] || '').replace(/-/g, ' ');
     const title = slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : `Maison à ${commune}`;
     return {
       id: `wim-${p.id}`,
