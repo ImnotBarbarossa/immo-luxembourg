@@ -225,8 +225,12 @@ async function fetchHonesty({ region, budget, fourFacades }) {
   const zips = region && REGION_POSTALS[region]
     ? [REGION_POSTALS[region][0]]
     : ['6717', '6780'];
-  const makeUrl = (zip) =>
-    `${HONESTY_BASE}/biens-a-vendre/?purpose=%5B1%2C3%5D&orderByField=Zip&orderSorting=ASC&displayStatusIdList=%5B2%5D&searchtxtinput=${zip}&searchinput=${zip}&searchziplabel=${zip}&category=1&rooms=0&minprice=&maxprice=${budget || 600000}&inputestateid=`;
+  // searchziplabel doit être au format "Commune (code postal)" sinon la page
+  // revient vide (constaté par diagnostic : zip brut → 0 bien, label → OK)
+  const makeUrl = (zip) => {
+    const label = encodeURIComponent(`${ZIP_TO_COMMUNE[zip] || zip} (${zip})`);
+    return `${HONESTY_BASE}/biens-a-vendre/?purpose=%5B1%2C3%5D&orderByField=Zip&orderSorting=ASC&displayStatusIdList=%5B2%5D&searchtxtinput=${label}&searchinput=${zip}&searchziplabel=${label}&category=1&rooms=0&minprice=&maxprice=${budget || 600000}&inputestateid=`;
+  };
 
   const pages = await Promise.allSettled(zips.map((z) => fetchText(makeUrl(z))));
   const byId = new Map();
