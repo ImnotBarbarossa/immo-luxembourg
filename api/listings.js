@@ -218,14 +218,15 @@ async function fetchImmoweb({ region, budget, fourFacades }) {
 }
 
 // ── Honesty (JSON Whise embarqué dans la page de recherche) ──────────────────
-// La page n'embarque qu'une page de résultats : on interroge commune par
-// commune (searchinput=code postal, comme le fait le site lui-même)
+// La recherche par code postal rayonne sur les communes voisines ; le format
+// d'URL doit être complet (orderByField, rooms, minprice…) sinon la page
+// revient vide. Format calqué sur une recherche faite sur le site.
 async function fetchHonesty({ region, budget, fourFacades }) {
   const zips = region && REGION_POSTALS[region]
-    ? REGION_POSTALS[region].slice(0, 2)
-    : ['6700', '6717', '6720', '6780'];
+    ? [REGION_POSTALS[region][0]]
+    : ['6717', '6780'];
   const makeUrl = (zip) =>
-    `${HONESTY_BASE}/biens-a-vendre/?purpose=%5B1%2C3%5D&displayStatusIdList=%5B2%5D&category=1&searchinput=${zip}&searchtxtinput=${zip}&searchziplabel=${zip}&maxprice=${budget || 600000}`;
+    `${HONESTY_BASE}/biens-a-vendre/?purpose=%5B1%2C3%5D&orderByField=Zip&orderSorting=ASC&displayStatusIdList=%5B2%5D&searchtxtinput=${zip}&searchinput=${zip}&searchziplabel=${zip}&category=1&rooms=0&minprice=&maxprice=${budget || 600000}&inputestateid=`;
 
   const pages = await Promise.allSettled(zips.map((z) => fetchText(makeUrl(z))));
   const byId = new Map();
