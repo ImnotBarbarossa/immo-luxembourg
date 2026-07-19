@@ -24,7 +24,8 @@ const REGION_MATCH = {
 const ZONE_RE = new RegExp(Object.values(REGION_MATCH).map((r) => r.source).join('|'), 'i');
 
 // Mentions qui excluent un bien "4 façades" (maison mitoyenne, 2-3 façades…)
-const NOT_DETACHED_RE = /(2|3|deux|trois)\s*fa[çc]ades|mitoyen|jumel[ée]|semi-?detached|maison de (ville|rang[ée]e)|row\s*house|town\s*house/i;
+// Séparateurs [\s-] : fonctionne aussi sur les slugs d'URL ("maison-2-facades")
+const NOT_DETACHED_RE = /(2|3|deux|trois)[\s-]*fa[çc]ades|mitoyen|jumel[ée]|semi-?detached|maison[\s-]de[\s-](ville|rang[ée]e)|row[\s-]?house|town[\s-]?house/i;
 
 // Sous-types Immoweb structurellement incompatibles avec une maison 4 façades
 const ATTACHED_SUBTYPES = new Set(['TOWN_HOUSE', 'APARTMENT_BLOCK', 'MIXED_USE_BUILDING']);
@@ -72,70 +73,60 @@ function parsePrice(text) {
   return n >= 40000 && n <= 5000000 ? n : 0;
 }
 
-// Extracteur générique : toute ancre dont le contenu affiche un prix en € est
-// considérée comme une carte d'annonce (les cartes de ces sites sont des <a>)
-function extractCards(html, baseUrl) {
-  const cards = [];
-  const seen = new Set();
-  const anchorRe = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  let m;
-  while ((m = anchorRe.exec(html))) {
-    const inner = m[2];
-    const text = stripTags(inner);
-    const price = parsePrice(text);
-    if (!price || text.length < 15) continue;
-    let url;
-    try { url = new URL(m[1], baseUrl).href; } catch { continue; }
-    if (seen.has(url)) continue;
-    seen.add(url);
-    const imgSrc = (inner.match(/<img[^>]*src=["']([^"']+)["']/i) || [])[1] || null;
-    let image = null;
-    if (imgSrc && !imgSrc.startsWith('data:')) {
-      try { image = new URL(imgSrc, baseUrl).href; } catch { /* ignore */ }
+// ── Extraction Honesty (JSON Whise embarqué dans la page) ────────────────────
+// Chaque bien est un objet JSON contenant "putOnlineDateTime". On remonte au
+// '{' englobant (vérifié par JSON.parse) plutôt que de compter les crochets,
+// car les textes des annonces contiennent des "[oui/non]" qui piègent un scan naïf.
+function scanObjectEnd(text, start) {
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (esc) { esc = false; continue; }
+    if (ch === '\\') { esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') { depth--; if (depth === 0) return i; }
+  }
+  return -1;
+}
+
+function extractWhiseEstates(html) {
+  const estates = [];
+  let idx = -1;
+  while ((idx = html.indexOf('"putOnlineDateTime"', idx + 1)) !== -1) {
+    let probe = idx;
+    for (let t = 0; t < 300 && probe > 0; t++) {
+      probe = html.lastIndexOf('{', probe - 1);
+      if (probe === -1) break;
+      const end = scanObjectEnd(html, probe);
+      if (end > idx) {
+        try {
+          const obj = JSON.parse(html.slice(probe, end + 1));
+          if (obj && typeof obj === 'object' && 'putOnlineDateTime' in obj) {
+            estates.push(obj);
+            idx = end;
+            break;
+          }
+        } catch { /* '{' au milieu d'une chaîne : on continue à remonter */ }
+      }
     }
-    cards.push({ url, text, price, image });
   }
-  return cards;
+  return estates;
 }
 
-function makeTitle(text) {
-  const t = text.replace(/(\d{1,3}(?:[.\s  ]\d{3})+|\d{5,7})\s*€/g, '').replace(/\s+/g, ' ').trim();
-  return t.length > 80 ? `${t.slice(0, 77)}…` : t || 'Annonce';
+function daysAgoFrom(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.max(0, Math.round((Date.now() - d) / 86400000));
 }
 
-function extractLocality(text) {
-  for (const [, re] of Object.entries(REGION_MATCH)) {
-    const m = text.match(re);
-    if (m && /[a-z]/i.test(m[0])) return m[0].charAt(0).toUpperCase() + m[0].slice(1).toLowerCase();
-  }
-  const zip = text.match(/\b(6700|6704|6706|6717|672[0134]|678[012])\b/);
-  return zip ? `CP ${zip[0]}` : 'Région d\'Arlon';
-}
-
-function cardsToListings(cards, { source, prefix, region, fourFacades, budget, requireZone }) {
-  return cards
-    // Zone : on écarte ce qui est localisé hors zone ; sans info, bénéfice du doute
-    .filter((c) => !requireZone || !/\b\d{4}\b/.test(c.text) || ZONE_RE.test(c.text))
-    .filter((c) => !region || !REGION_MATCH[region] || !ZONE_RE.test(c.text) || REGION_MATCH[region].test(c.text))
-    .filter((c) => !fourFacades || !NOT_DETACHED_RE.test(c.text))
-    .filter((c) => !budget || !c.price || c.price <= budget)
-    .slice(0, 12)
-    .map((c) => ({
-      id: `${prefix}-${c.url.replace(/\W+/g, '').slice(-28)}`,
-      title: makeTitle(c.text),
-      type: 'Maison',
-      location: extractLocality(c.text),
-      price: c.price,
-      surface: parseInt((c.text.match(/(\d{2,4})\s*m²/) || [])[1] || '0', 10),
-      rooms: 0,
-      bedrooms: parseInt((c.text.match(/(\d{1,2})\s*(?:chambres?|ch\b)/i) || [])[1] || '0', 10),
-      source,
-      isNew: false,
-      daysAgo: null,
-      url: c.url,
-      image: c.image,
-    }));
-}
+const ZIP_TO_COMMUNE = {
+  6700: 'Arlon', 6704: 'Guirsch', 6706: 'Autelbas', 6717: 'Attert',
+  6720: 'Habay', 6721: 'Anlier', 6723: 'Habay-la-Vieille', 6724: 'Marbehan',
+  6780: 'Messancy', 6781: 'Sélange', 6782: 'Habergy',
+};
 
 // ── Immoweb (API JSON) ───────────────────────────────────────────────────────
 async function fetchImmoweb({ region, budget, fourFacades }) {
@@ -226,28 +217,98 @@ async function fetchImmoweb({ region, budget, fourFacades }) {
   });
 }
 
-// ── Honesty (recherche de l'utilisateur, tous biens puis filtre zone) ────────
+// ── Honesty (JSON Whise embarqué dans la page de recherche) ──────────────────
 async function fetchHonesty({ region, budget, fourFacades }) {
-  const url = `${HONESTY_BASE}/biens-a-vendre/?purpose=%5B1%2C3%5D&displayStatusIdList=%5B2%5D&category=1&orderByField=Zip&orderSorting=ASC&maxprice=${budget || 600000}`;
+  const url = `${HONESTY_BASE}/biens-a-vendre/?purpose=%5B1%2C3%5D&displayStatusIdList=%5B2%5D&category=1&maxprice=${budget || 600000}`;
   const html = await fetchText(url);
-  const cards = extractCards(html, HONESTY_BASE);
-  if (cards.length === 0) throw new Error('honesty: 0 annonces parsées (structure de page inconnue ?)');
-  return cardsToListings(cards, { source: 'honesty', prefix: 'hon', region, fourFacades, budget, requireZone: true });
+  const estates = extractWhiseEstates(html);
+  if (!estates.length) throw new Error('honesty: aucun bien extrait de la page');
+
+  // La page embarque tout le réseau Honesty : on filtre nous-mêmes
+  let list = estates.filter((e) => ZONE_POSTALS.has(String(e.zip || '')));
+  // Vente uniquement (purposeId 1 = vente chez Whise) et maisons si renseigné
+  list = list.filter((e) => !e.purposeId || e.purposeId === 1 || e.purposeId === 3);
+  if (region && REGION_POSTALS[region]) {
+    const filtered = list.filter((e) => REGION_POSTALS[region].includes(String(e.zip)));
+    if (filtered.length > 0) list = filtered;
+  }
+  if (fourFacades) {
+    list = list.filter((e) =>
+      !NOT_DETACHED_RE.test(`${e.name || ''} ${e.shortDescription?.content || ''}`));
+  }
+  if (budget) list = list.filter((e) => !e.price || e.price <= budget);
+
+  return list.slice(0, 12).map((e) => {
+    const daysAgo = daysAgoFrom(e.putOnlineDateTime);
+    const city = e.city || ZIP_TO_COMMUNE[e.zip] || `CP ${e.zip}`;
+    const pic = Array.isArray(e.pictures) && e.pictures[0]
+      ? (e.pictures[0].urlLarge || e.pictures[0].urlSmall || null) : null;
+    return {
+      id: `hon-${e.id || e.referenceNumber}`,
+      title: e.name && !/^\d/.test(e.name) ? e.name : `Maison à ${city}`,
+      type: 'Maison',
+      location: city,
+      price: e.price || 0,
+      surface: e.maxArea || e.minArea || 0,
+      rooms: 0,
+      bedrooms: e.rooms || 0,
+      source: 'honesty',
+      isNew: daysAgo != null && daysAgo <= 3,
+      daysAgo,
+      url: `${HONESTY_BASE}/biens-a-vendre/?inputestateid=${e.id || ''}`,
+      image: pic,
+    };
+  });
 }
 
-// ── W Immobilière (recherche de l'utilisateur, codes postaux de la zone) ─────
+// ── W Immobilière (JSON des biens dans #properties-locations-json) ───────────
 async function fetchWimmo({ region, budget, fourFacades }) {
-  const zips = region && REGION_POSTALS[region] ? REGION_POSTALS[region] : [...ZONE_POSTALS];
-  const zipParams = zips.map((z) => `&Zips%5B%5D=${z}`).join('');
-  const max = budget || 600000;
-  const url = `${WIMMO_BASE}/rechercher/biens?SortFields=ID+DESC&Goal=0&WebIDs=1${zipParams}&PriceTo=${max}&Price=%7C${max}`;
+  const url = `${WIMMO_BASE}/rechercher/biens?SortFields=ID+DESC&Goal=0&WebIDs=1&PriceTo=${budget || 600000}`;
   const html = await fetchText(url);
-  const cards = extractCards(html, WIMMO_BASE);
-  if (cards.length === 0) throw new Error('wimmo: 0 annonces parsées (structure de page inconnue ?)');
-  return cardsToListings(cards, { source: 'wimmo', prefix: 'wim', region, fourFacades, budget, requireZone: false });
+  const divIdx = html.indexOf('properties-locations-json');
+  if (divIdx === -1) throw new Error('wimmo: bloc de données introuvable');
+  const arrStart = html.indexOf('[', divIdx);
+  const arrEnd = html.indexOf(']</div>', arrStart);
+  if (arrStart === -1 || arrEnd === -1) throw new Error('wimmo: JSON introuvable');
+  const decoded = html.slice(arrStart, arrEnd + 1)
+    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&amp;/g, '&');
+  const props = JSON.parse(decoded);
+
+  const linkTxt = (p) => { try { return decodeURIComponent(p.link || '').toLowerCase(); } catch { return (p.link || '').toLowerCase(); } };
+  // goal 0 = vente ; on ne garde que les maisons/villas de la zone
+  let list = props.filter((p) => p.goal === 0 && /\/acheter\/(maison|villa)/.test(linkTxt(p)));
+  list = list.filter((p) => ZONE_RE.test(linkTxt(p)));
+  if (region && REGION_MATCH[region]) {
+    const filtered = list.filter((p) => REGION_MATCH[region].test(linkTxt(p)));
+    if (filtered.length > 0) list = filtered;
+  }
+  if (fourFacades) list = list.filter((p) => !NOT_DETACHED_RE.test(linkTxt(p)));
+  if (budget) list = list.filter((p) => { const pr = parsePrice(p.title || ''); return !pr || pr <= budget; });
+
+  return list.slice(0, 12).map((p) => {
+    const parts = linkTxt(p).split('/').filter(Boolean);
+    const commune = parts[3] || 'arlon';
+    const slug = (parts[5] || '').replace(/-/g, ' ');
+    const title = slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : `Maison à ${commune}`;
+    return {
+      id: `wim-${p.id}`,
+      title,
+      type: 'Maison',
+      location: commune.charAt(0).toUpperCase() + commune.slice(1),
+      price: parsePrice(p.title || ''),
+      surface: 0,
+      rooms: 0,
+      bedrooms: 0,
+      source: 'wimmo',
+      isNew: false,
+      daysAgo: null,
+      url: p.link,
+      image: null,
+    };
+  });
 }
 
-// ── ERA (recherche de l'utilisateur : agence Sud-Luxembourg, ses communes) ───
+// ── ERA (cartes Drupal rendues côté serveur ; lien via /fr/node/{nid}) ───────
 async function fetchEra({ region, budget, fourFacades }) {
   const max = budget || 600000;
   const url = `${ERA_BASE}/fr/a-vendre?pager%5Blimit%5D=24&broker_id=6000144`
@@ -256,9 +317,52 @@ async function fetchEra({ region, budget, fourFacades }) {
     + '&filter%5Bproperty_type%5D=46'
     + `&filter%5Bprice%5D=%28min%3A%3Bmax%3A${max}%29`;
   const html = await fetchText(url);
-  const cards = extractCards(html, ERA_BASE);
-  if (cards.length === 0) throw new Error('era: 0 annonces parsées (structure de page inconnue ?)');
-  return cardsToListings(cards, { source: 'era', prefix: 'era', region, fourFacades, budget, requireZone: false });
+
+  const cardRe = /data-nid="(\d+)"[\s\S]{0,900}?property-teaser__content[\s\S]{0,400}?<h3>([^<]+)<\/h3>[\s\S]{0,300}?field--price">([^<]+)<[\s\S]{0,400}?field--address[^>]*>([^<]+)</g;
+  const seen = new Set();
+  const cards = [];
+  let m;
+  while ((m = cardRe.exec(html))) {
+    const [, nid, title, priceTxt, address] = m;
+    if (seen.has(nid)) continue;
+    seen.add(nid);
+    const after = html.slice(m.index, m.index + 2500);
+    cards.push({
+      nid,
+      title: title.trim(),
+      price: parsePrice(priceTxt),
+      address: address.trim(),
+      zip: (address.match(/\b(\d{4})\b/) || [])[1] || '',
+      bedrooms: parseInt((after.match(/(\d{1,2})\s*chbre/) || [])[1] || '0', 10),
+      surface: parseInt((after.match(/(\d{2,4})\s*m²\s*de surf/) || [])[1] || '0', 10),
+    });
+  }
+  if (!cards.length) throw new Error('era: aucune carte parsée');
+
+  // Les filtres GET d'era.be ne s'appliquent pas côté serveur : filtre zone strict
+  let list = cards.filter((c) => ZONE_POSTALS.has(c.zip));
+  if (region && REGION_POSTALS[region]) {
+    const filtered = list.filter((c) => REGION_POSTALS[region].includes(c.zip));
+    if (filtered.length > 0) list = filtered;
+  }
+  if (fourFacades) list = list.filter((c) => !NOT_DETACHED_RE.test(c.title));
+  if (budget) list = list.filter((c) => !c.price || c.price <= budget);
+
+  return list.slice(0, 12).map((c) => ({
+    id: `era-${c.nid}`,
+    title: c.title,
+    type: 'Maison',
+    location: c.address.replace(/^[^,]*,\s*/, ''),
+    price: c.price,
+    surface: c.surface,
+    rooms: 0,
+    bedrooms: c.bedrooms,
+    source: 'era',
+    isNew: false,
+    daysAgo: null,
+    url: `${ERA_BASE}/fr/node/${c.nid}`,
+    image: null,
+  }));
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
