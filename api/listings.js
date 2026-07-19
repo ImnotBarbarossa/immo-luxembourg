@@ -306,12 +306,22 @@ async function fetchWimmo({ region, budget, fourFacades }) {
   if (fourFacades) list = list.filter((p) => !NOT_DETACHED_RE.test(linkTxt(p)));
   if (budget) list = list.filter((p) => { const pr = parsePrice(p.title || ''); return !pr || pr <= budget; });
 
-  return list.slice(0, 12).map((p) => {
+  // Le JSON ne contient pas d'image : on lit l'og:image de chaque fiche en parallèle
+  return Promise.all(list.slice(0, 12).map(async (p) => {
     // linkTxt : ['https:', 'www.wimmobiliere.com', 'acheter', 'maison', commune, id, slug]
     const parts = linkTxt(p).split('/').filter(Boolean);
     const commune = parts[4] || 'arlon';
     const slug = (parts[6] || '').replace(/-/g, ' ');
     const title = slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : `Maison à ${commune}`;
+
+    let image = null;
+    try {
+      const detail = await fetchText(p.link);
+      const og = detail.match(/property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+        || detail.match(/content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+      if (og && /^https?:\/\//.test(og[1])) image = og[1].replace(/&amp;/g, '&');
+    } catch { /* fiche inaccessible : pas d'image */ }
+
     return {
       id: `wim-${p.id}`,
       title,
@@ -325,9 +335,9 @@ async function fetchWimmo({ region, budget, fourFacades }) {
       isNew: false,
       daysAgo: null,
       url: p.link,
-      image: null,
+      image,
     };
-  });
+  }));
 }
 
 // ── ERA (cartes Drupal rendues côté serveur ; lien via /fr/node/{nid}) ───────
@@ -349,6 +359,12 @@ async function fetchEra({ region, budget, fourFacades }) {
     if (seen.has(nid)) continue;
     seen.add(nid);
     const after = html.slice(m.index, m.index + 2500);
+    // La photo du bien est dans l'<article> qui précède le bloc teaser
+    const before = html.slice(Math.max(0, m.index - 6000), m.index);
+    const imgs = [...before.matchAll(/src="([^"]*eraforce\/images\/property[^"]*)"/g)];
+    const rawImg = imgs.length ? imgs[imgs.length - 1][1].replace(/&amp;/g, '&') : null;
+    let image = null;
+    if (rawImg) { try { image = new URL(rawImg, ERA_BASE).href; } catch { /* ignore */ } }
     cards.push({
       nid,
       title: title.trim(),
@@ -357,6 +373,7 @@ async function fetchEra({ region, budget, fourFacades }) {
       zip: (address.match(/\b(\d{4})\b/) || [])[1] || '',
       bedrooms: parseInt((after.match(/(\d{1,2})\s*chbre/) || [])[1] || '0', 10),
       surface: parseInt((after.match(/(\d{2,4})\s*m²\s*de surf/) || [])[1] || '0', 10),
+      image,
     });
   }
   if (!cards.length) throw new Error('era: aucune carte parsée');
@@ -383,7 +400,7 @@ async function fetchEra({ region, budget, fourFacades }) {
     isNew: false,
     daysAgo: null,
     url: `${ERA_BASE}/fr/node/${c.nid}`,
-    image: null,
+    image: c.image,
   }));
 }
 

@@ -52,6 +52,19 @@ const ZONE = new Set(['6700','6704','6706','6717','6720','6721','6723','6724','6
     } catch (e) { console.log(`  ${src}: ${l.url} → ERR ${e.message}`); }
   }
 
+  console.log('\n════ TEST 5 : images par source ════');
+  for (const src of ['immoweb', 'honesty', 'wimmo', 'era']) {
+    const items = r1.listings.filter((x) => x.source === src);
+    const withImg = items.filter((x) => x.image);
+    console.log(`  ${src}: ${withImg.length}/${items.length} avec image`);
+    if (withImg[0]) {
+      try {
+        const resp = await fetch(withImg[0].image, { headers: { 'User-Agent': UA } });
+        console.log(`    ${withImg[0].image.slice(0, 100)} → ${resp.status}`);
+      } catch (e) { console.log(`    image ERR: ${e.message}`); }
+    }
+  }
+
   console.log('\n════ VÉRIFS ════');
   let bad = 0;
   for (const l of r1.listings) {

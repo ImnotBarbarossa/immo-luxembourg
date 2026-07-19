@@ -427,6 +427,7 @@
       <option value="price_asc">Prix croissant</option>
       <option value="price_desc">Prix décroissant</option>
       <option value="surface">Surface</option>
+      <option value="agency">Par agence</option>
     </select>
   </div>
 
@@ -655,6 +656,9 @@ function renderListings() {
   if (sort === 'price_asc') data.sort((a,b) => a.price - b.price);
   else if (sort === 'price_desc') data.sort((a,b) => b.price - a.price);
   else if (sort === 'surface') data.sort((a,b) => b.surface - a.surface);
+  else if (sort === 'agency') data.sort((a,b) =>
+    (sourceLabels[a.source]||a.source).localeCompare(sourceLabels[b.source]||b.source, 'fr')
+    || a.price - b.price);
   else data.sort((a,b) => (a.daysAgo ?? 99) - (b.daysAgo ?? 99));
 
   const total = data.length;
