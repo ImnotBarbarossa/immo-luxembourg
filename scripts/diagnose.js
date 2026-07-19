@@ -1,98 +1,83 @@
-// Diagnostic des 4 sources : exécute le handler réel puis, pour chaque source
-// vide ou en erreur, récupère la page brute et imprime des indices de structure.
-const handler = require('../api/listings.js');
-
-const URLS = {
-  immoweb: 'https://www.immoweb.be/fr/search-results?countries=BE&postalCodes=6700,6704,6706,6717,6720,6721,6723,6724,6780,6781,6782&transactionTypes=FOR_SALE&propertyTypes=HOUSE&orderBy=newest&size=30&page=1&minFacadeCount=4',
-  honesty: 'https://www.honesty.be/biens-a-vendre/?purpose=%5B1%2C3%5D&displayStatusIdList=%5B2%5D&category=1&orderByField=Zip&orderSorting=ASC&maxprice=600000',
-  wimmo: 'https://www.wimmobiliere.com/rechercher/biens?SortFields=ID+DESC&Goal=0&WebIDs=1&Zips%5B%5D=6700&Zips%5B%5D=6704&Zips%5B%5D=6706&Zips%5B%5D=6717&Zips%5B%5D=6720&Zips%5B%5D=6721&Zips%5B%5D=6723&Zips%5B%5D=6724&Zips%5B%5D=6780&Zips%5B%5D=6781&Zips%5B%5D=6782&PriceTo=600000&Price=%7C600000',
-  era: 'https://www.era.be/fr/a-vendre?pager%5Blimit%5D=24&broker_id=6000144&filter%5Blocation%5D%5Bmunicipalities%5D=187+181&filter%5Blocation%5D%5Bsub_municipalities%5D=796+946+1386+1450+2536+2008+2019+2501+2543&filter%5Bproperty_type%5D=46&filter%5Bprice%5D=%28min%3A%3Bmax%3A600000%29',
-};
-
+// Diagnostic v2 : extraire la structure exacte des données de chaque site.
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36';
 
-function probeHtml(html) {
-  const marks = {
-    length: html.length,
-    euroSigns: (html.match(/€/g) || []).length,
-    anchors: (html.match(/<a\b/gi) || []).length,
-    imgs: (html.match(/<img\b/gi) || []).length,
-    nextData: html.includes('__NEXT_DATA__'),
-    nuxt: html.includes('__NUXT__'),
-    initialState: html.includes('__INITIAL_STATE__'),
-    ldJson: (html.match(/application\/ld\+json/g) || []).length,
-    adminAjax: html.includes('admin-ajax.php'),
-    wpJson: html.includes('/wp-json/'),
-    datadome: /datadome/i.test(html),
-    cloudflare: /cf-browser-verification|challenge-platform|cloudflare/i.test(html),
-    captcha: /captcha/i.test(html),
-  };
-  return marks;
+async function get(url, headers = {}) {
+  const resp = await fetch(url, {
+    headers: {
+      'User-Agent': UA,
+      'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+      'Accept-Language': 'fr-BE,fr;q=0.9',
+      ...headers,
+    },
+    redirect: 'follow',
+  });
+  const body = await resp.text();
+  return { status: resp.status, body, ct: resp.headers.get('content-type') };
 }
 
-function sampleAnchorsWithPrice(html) {
-  const out = [];
-  const re = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  let m;
-  while ((m = re.exec(html)) && out.length < 5) {
-    const text = m[2].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-    if (/€/.test(text)) out.push({ href: m[1].slice(0, 120), text: text.slice(0, 160) });
+function around(hay, needle, before, after, nth = 0) {
+  let idx = -1;
+  for (let i = 0; i <= nth; i++) {
+    idx = hay.indexOf(needle, idx + 1);
+    if (idx === -1) return null;
   }
-  return out;
-}
-
-function sampleLdJson(html) {
-  const out = [];
-  const re = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
-  let m;
-  while ((m = re.exec(html)) && out.length < 2) out.push(m[1].slice(0, 800));
-  return out;
-}
-
-async function rawProbe(name, url) {
-  console.log(`\n──── PROBE ${name} ────`);
-  console.log('URL:', url);
-  try {
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': UA,
-        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
-        'Accept-Language': 'fr-BE,fr;q=0.9',
-      },
-      redirect: 'follow',
-    });
-    console.log('HTTP', resp.status, '| content-type:', resp.headers.get('content-type'));
-    console.log('final URL:', resp.url);
-    const body = await resp.text();
-    console.log('markers:', JSON.stringify(probeHtml(body)));
-    const anchors = sampleAnchorsWithPrice(body);
-    console.log('anchors avec € :', anchors.length);
-    anchors.forEach((a) => console.log('  •', a.href, '||', a.text));
-    const ld = sampleLdJson(body);
-    ld.forEach((s, i) => console.log(`ld+json[${i}]:`, s.replace(/\s+/g, ' ').slice(0, 500)));
-    // Aperçu du body (début + zone médiane) pour repérer la structure
-    console.log('body[0:1200]:', body.slice(0, 1200).replace(/\s+/g, ' '));
-    const mid = Math.floor(body.length / 2);
-    console.log(`body[${mid}:${mid + 800}]:`, body.slice(mid, mid + 800).replace(/\s+/g, ' '));
-  } catch (e) {
-    console.log('FETCH ERROR:', e.message);
-  }
+  return hay.slice(Math.max(0, idx - before), idx + after).replace(/\s+/g, ' ');
 }
 
 (async () => {
-  console.log('════ ÉTAPE 1 : handler réel ════');
-  const req = { method: 'GET', query: { fourFacades: '1', budget: '600000' } };
-  const result = await new Promise((resolve) => {
-    const res = { status(c) { this.code = c; return this; }, json(o) { resolve(o); return this; } };
-    handler(req, res);
-  });
-  console.log('sources:', JSON.stringify(result.sources, null, 2));
-  for (const l of result.listings.slice(0, 8)) {
-    console.log(`  [${l.source}] ${l.price}€ ${l.location} | ${l.title.slice(0, 60)} | ${l.url}`);
+  // ── HONESTY : trouver le JSON des biens (Whise) ────────────────────────────
+  console.log('════ HONESTY ════');
+  const hon = await get('https://www.honesty.be/biens-a-vendre/?purpose=%5B1%2C3%5D&displayStatusIdList=%5B2%5D&category=1&maxprice=600000');
+  console.log('HTTP', hon.status, 'len', hon.body.length);
+  // Où commence la structure de données ? Cherche les clés typiques Whise
+  for (const key of ['"purposeId"', '"zip"', '"price"', '"estates"', 'window.', 'estateList']) {
+    const ctx = around(hon.body, key, 300, 500);
+    if (ctx) console.log(`\n[${key}] …${ctx}…`);
+  }
+  // Une URL de détail d'annonce ressemble à quoi ?
+  const honLinks = [...hon.body.matchAll(/href=["']([^"']*(?:bien|estate|detail|property)[^"']*)["']/gi)].map(m => m[1]).slice(0, 10);
+  console.log('\nliens détail candidats:', JSON.stringify(honLinks, null, 1));
+
+  // ── WIMMO : trouver l'endpoint API appelé par le front ─────────────────────
+  console.log('\n════ WIMMO ════');
+  const wim = await get('https://www.wimmobiliere.com/rechercher/biens?SortFields=ID+DESC&Goal=0&WebIDs=1&Zips%5B%5D=6717&PriceTo=600000');
+  console.log('HTTP', wim.status, 'len', wim.body.length);
+  for (const key of ['/api/', 'fetch(', 'axios', '.json', 'ajax', 'estates', 'Omnicasa', 'whise', 'GetProperties']) {
+    const ctx = around(wim.body, key, 250, 400);
+    if (ctx) console.log(`\n[${key}] …${ctx}…`);
+  }
+  const wimScripts = [...wim.body.matchAll(/<script[^>]*src=["']([^"']+)["']/gi)].map(m => m[1]);
+  console.log('\nscripts:', JSON.stringify(wimScripts, null, 1));
+  // Contexte des 4 € trouvés
+  for (let i = 0; i < 4; i++) {
+    const ctx = around(wim.body, '€', 250, 100, i);
+    if (ctx) console.log(`\n€[${i}] …${ctx}…`);
   }
 
-  console.log('\n════ ÉTAPE 2 : probes bruts ════');
-  for (const [name, url] of Object.entries(URLS)) {
-    await rawProbe(name, url);
+  // ── WIMMO : tenter le JS principal pour trouver l'API ─────────────────────
+  const mainJs = wimScripts.find(s => /app|main|index/.test(s));
+  if (mainJs) {
+    try {
+      const jsUrl = new URL(mainJs, 'https://www.wimmobiliere.com').href;
+      const js = await get(jsUrl);
+      console.log('\nmain JS:', jsUrl, 'HTTP', js.status, 'len', js.body.length);
+      for (const key of ['/api/', 'rechercher', 'GetEstate', 'properties', 'baseURL']) {
+        const ctx = around(js.body, key, 200, 300);
+        if (ctx) console.log(`\nJS[${key}] …${ctx}…`);
+      }
+    } catch (e) { console.log('main JS error:', e.message); }
   }
+
+  // ── ERA : structure des cartes (prix hors ancre) ───────────────────────────
+  console.log('\n════ ERA ════');
+  const era = await get('https://www.era.be/fr/a-vendre?pager%5Blimit%5D=24&broker_id=6000144&filter%5Blocation%5D%5Bmunicipalities%5D=187+181&filter%5Blocation%5D%5Bsub_municipalities%5D=796+946+1386+1450+2536+2008+2019+2501+2543&filter%5Bproperty_type%5D=46&filter%5Bprice%5D=%28min%3A%3Bmax%3A600000%29');
+  console.log('HTTP', era.status, 'len', era.body.length);
+  // Contexte complet autour des 3 premiers €
+  for (let i = 0; i < 3; i++) {
+    const ctx = around(era.body, '€', 1500, 300, i);
+    if (ctx) console.log(`\n€[${i}] …${ctx}…\n`);
+  }
+  const eraLinks = [...era.body.matchAll(/href=["']([^"']*\/fr\/[^"']*)["']/gi)]
+    .map(m => m[1]).filter(h => !/a-vendre|a-louer|agences|estimation|contact|jobs|blog|#|\?/.test(h)).slice(0, 15);
+  console.log('liens candidats:', JSON.stringify([...new Set(eraLinks)], null, 1));
 })();
